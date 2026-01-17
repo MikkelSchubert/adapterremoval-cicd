@@ -61,7 +61,7 @@ jobs:
       - name: dependencies (common)
         run: bash scripts/setup-common.sh
 
-      - if: ${{ matrix.os == "osx-latest" }}
+      - if: ${{ matrix.os == "macos-latest" }}
         name: build, test, and bundle
         run: |
           bash scripts/build-common.sh STATIC=true
