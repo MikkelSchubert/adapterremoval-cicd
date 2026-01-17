@@ -80,7 +80,9 @@ jobs:
       - name: Read changelog
         id: changelog
         shell: bash
-        run: python3 scripts/latest-changes.py --escape CHANGES.md >> $GITHUB_OUTPUT
+        run: |
+          echo -n "TEXT=" >> $GITHUB_OUTPUT
+          python3 scripts/latest-changes.py --escape  CHANGES.md >> $GITHUB_OUTPUT
 
       - name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3

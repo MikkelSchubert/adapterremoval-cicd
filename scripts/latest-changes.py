@@ -40,7 +40,7 @@ def main(argv: list[str]) -> int:
 
                 lines.append(line.rstrip())
     lines.append("")  # trailing newline
-    text = "\n".join(lines)
+    text = "\n".join(lines).strip("\n")
     if args.escape:
         text = urllib.parse.quote(text)
 
