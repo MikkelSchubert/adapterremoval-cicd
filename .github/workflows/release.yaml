@@ -55,8 +55,8 @@ jobs:
       #     mold-version: 2.38.0
       #     make-default: true
 
-      # - name: dependencies (OS specific)
-      #   run: bash scripts/setup-${{ matrix.os }}.sh
+      - name: dependencies (OS specific)
+        run: bash scripts/setup-${{ matrix.os }}.sh
 
       - name: dependencies (common)
         run: bash scripts/setup-common.sh
