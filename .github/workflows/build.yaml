@@ -93,5 +93,4 @@ jobs:
         name: setup, build, and test
         run: |
           bash scripts/setup-windows-latest.sh
-          bash scripts/setup-common.sh
           bash scripts/build-common.sh
