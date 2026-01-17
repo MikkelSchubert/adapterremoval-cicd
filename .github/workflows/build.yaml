@@ -73,7 +73,7 @@ jobs:
         # Manual ccache cleanup, using the ccache-action default max size
         run: env CCACHE_MAXSIZE=500M ccache --cleanup
 
-build-windows:
+  build-windows:
     name: test on windows
 
     runs-on: windows-latest
