@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      draft_id: ${{ steps.create_release.outputs.draft_id }}
+      release_id: ${{ steps.create_release.outputs.release_id }}
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -38,7 +38,7 @@ jobs:
           tag: ${{ github.ref }}
           release_name: "AdapterRemoval ${{ github.ref_name }}"
           body: ${{ steps.changelog.outputs.TEXT }}
-          file: "."
+          file: "." # must exist, but wont be uploaded since it's not a file as of v2.11.3
           overwrite: true
           draft: true
 
@@ -114,5 +114,5 @@ jobs:
         with:
           asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
-          draft_id: ${{ needs.create_draft_release.outputs.draft_id }}
+          release_id: ${{ needs.create_draft_release.outputs.release_id }}
           draft: true
