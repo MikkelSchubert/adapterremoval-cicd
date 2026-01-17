@@ -1,7 +1,7 @@
 #!/bin/sh
 set -euo # "strict" mode
 
-pacman -Sy \
+pacman -S --noconfirm \
     make \
     mingw-w64-ucrt-x86_64-gcc \
     mingw-w64-ucrt-x86_64-isa-l  \
