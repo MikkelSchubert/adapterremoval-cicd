@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  release-unix:
     name: build assets for ${{ matrix.os }} with ${{ matrix.cxx }}
 
     runs-on: ${{ matrix.os }}
@@ -44,29 +44,29 @@ jobs:
         with:
           persist-credentials: false
 
-      # Use mold for faster linking
-      # - uses: rui314/setup-mold@45c2b085bbc0283c8e1443d4a511aaa1eda5a3a1 # v1
-      #   with:
-      #     mold-version: 2.38.0
-      #     make-default: true
+      - if: ${{ matrix.os == 'windows-latest' }}
+        uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda # v2.30.0
+        with:
+          msystem: ucrt64
 
       - name: dependencies (OS specific)
         run: bash scripts/setup-${{ matrix.os }}.sh
 
       - if: ${{ matrix.os == 'macos-latest' }}
-        name: setup, build, test, and bundle
+        name: setup, build, test, and bundle (OSX)
         run: |
           bash scripts/build-common.sh DOCS=true
           bash scripts/build-bundle.sh "build/install/opt/homebrew" "${TARGET}"
 
       - if: ${{ matrix.os == 'ubuntu-latest' }}
-        name: setup, build, test, and bundle
+        name: setup, build, test, and bundle (Linux)
         run: |
           make static-container static DOCS=true
           bash scripts/build-bundle.sh "build/static/install/usr/local" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
-        name: setup, build, test, and bundle
+        name: setup, build, test, and bundle (Windows)
+        shell: msys2 {0}
         run: |
           bash scripts/build-common.sh STATIC=true DOCS=true
           bash scripts/build-bundle.sh "build/install/usr/local" "${TARGET}"
@@ -81,8 +81,7 @@ jobs:
           r="${r//$'\r'/'%0D'}"  # escape '\r'
           echo "TEXT=$r" >> $GITHUB_OUTPUT
 
-      - if: ${{ matrix.os == 'ubuntu-latest' }}
-        name: upload binaries to release
+      - name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
