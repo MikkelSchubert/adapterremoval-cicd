@@ -52,17 +52,17 @@ jobs:
       - name: dependencies (OS specific)
         run: bash scripts/setup-${{ matrix.os }}.sh
 
-      - if: ${{ matrix.os == 'macos-latest' }}
-        name: setup, build, test, and bundle (OSX)
-        run: |
-          bash scripts/build-common.sh DOCS=true
-          bash scripts/build-bundle.sh "build/install/opt/homebrew" "${TARGET}"
-
       - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: setup, build, test, and bundle (Linux)
         run: |
           make static-container static DOCS=true
           bash scripts/build-bundle.sh "build/static/install/usr/local" "${TARGET}"
+
+      - if: ${{ matrix.os == 'macos-latest' }}
+        name: setup, build, test, and bundle (OSX)
+        run: |
+          bash scripts/build-common.sh DOCS=true
+          bash scripts/build-bundle.sh "build/install/opt/homebrew" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
         name: setup, build, test, and bundle (Windows)

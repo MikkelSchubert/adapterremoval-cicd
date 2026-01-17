@@ -128,6 +128,7 @@ static:
 		DESTDIR=/host/out/static/install \
 		DEBUG=${DEBUG} \
 		COVERAGE=${COVERAGE} \
+		DOCS=${DOCS} \
 		SANITIZE=${SANITIZE} \
 		HARDEN=${HARDEN} \
 		STATIC=true \
