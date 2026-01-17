@@ -73,7 +73,8 @@ jobs:
         name: build, test, and bundle
         run: |
           make static-container static
-          mv "build/static/install/usr/local" "${{ matrix.name }}"
+          mv -v "build/static/install/usr/local" "${{ matrix.name }}"
+          find "${{ matrix.name }}/"
           strip "${{ matrix.name }}/bin/adapterremoval3"
           tar cvzf "${{ matrix.name }}.tar.gz" "${{ matrix.name }}"
 
