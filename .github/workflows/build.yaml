@@ -3,7 +3,7 @@ name: build
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main-disabled]
 
 permissions:
   contents: read
