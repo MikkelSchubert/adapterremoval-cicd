@@ -82,7 +82,7 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          r=$('1,/^## /d;/^## /,$d' CHANGES.md)
+          r=$(sed '1,/^## /d;/^## /,$d' CHANGES.md)
           r="${r//'%'/'%25'}"    # escape %
           r="${r//$'\n'/'%0A'}"  # escape '\n'
           r="${r//$'\r'/'%0D'}"  # escape '\r'
