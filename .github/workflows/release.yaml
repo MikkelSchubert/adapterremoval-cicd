@@ -55,6 +55,7 @@ jobs:
 
       - if: ${{ matrix.os == 'windows-latest' }}
         name: dependencies (Windows)
+        shell: msys2 {0}
         run: bash scripts/setup-${{ matrix.os }}.sh
 
       - if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -76,7 +77,8 @@ jobs:
           bash scripts/build-common.sh STATIC=true DOCS=true
           bash scripts/build-bundle.sh "build/install/usr/local" "${TARGET}"
 
-      - name: Read changelog
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        name: Read changelog
         id: changelog
         shell: bash
         run: |
