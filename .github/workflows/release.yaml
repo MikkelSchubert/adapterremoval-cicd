@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  create-draft-release:
+  create_draft_release:
     runs-on: ubuntu-latest
 
     outputs:
