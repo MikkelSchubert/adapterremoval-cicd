@@ -61,20 +61,20 @@ jobs:
       - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: setup, build, test, and bundle (Linux)
         run: |
-          make static-container static DOCS=true PREFIX=/
+          make static-container static DOCS=true
           bash scripts/build-bundle.sh "build/static/install/" "${TARGET}"
 
       - if: ${{ matrix.os == 'macos-latest' }}
         name: setup, build, test, and bundle (OSX)
         run: |
-          bash scripts/build-common.sh DOCS=true PREFIX=/
+          bash scripts/build-common.sh DOCS=true
           bash scripts/build-bundle.sh "build/install/" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
         name: setup, build, test, and bundle (Windows)
         shell: msys2 {0}
         run: |
-          bash scripts/build-common.sh STATIC=true DOCS=true PREFIX=/
+          bash scripts/build-common.sh STATIC=true DOCS=true
           bash scripts/build-bundle.sh "build/install/" "${TARGET}"
 
       - name: Read changelog
