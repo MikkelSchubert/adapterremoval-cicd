@@ -1,0 +1,20 @@
+{
+  "exhaustive": false,
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--quality-trimming",
+    "window",
+    "--trim-windows",
+    "-1"
+  ],
+  "return_code": 1,
+  "stderr": [
+    "[ERROR] Invalid command-line argument --trim-windows -1: value must be at least 0"
+  ],
+  "files": {
+    "input_1": [
+      "input_1a.fastq"
+    ]
+  }
+}

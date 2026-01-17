@@ -1,0 +1,29 @@
+{
+  "arguments": [
+    "--quality-trimming",
+    "per-base",
+    "--trim-ns",
+    "--trim-qualities",
+    "--merge",
+    "--out-prefix",
+    "output_7"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ],
+    "output": [
+      "output_7.merged.fastq.gz",
+      "output_7.r1.fastq.gz",
+      "output_7.r2.fastq.gz",
+      "output_7.singleton.fastq.gz"
+    ],
+    "ignore": [
+      "output_7.json",
+      "output_7.html"
+    ]
+  }
+}

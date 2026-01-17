@@ -1,0 +1,21 @@
+{
+  "description": "Trimming of unknown adapters (SE)",
+  "arguments": [
+    "--adapter1",
+    "",
+    "--out-prefix",
+    "output_undefined_se"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "json": [
+      "output_undefined_se.json"
+    ],
+    "ignore": [
+      "output_undefined_se.r1.fastq.gz",
+      "output_undefined_se.html"
+    ]
+  }
+}

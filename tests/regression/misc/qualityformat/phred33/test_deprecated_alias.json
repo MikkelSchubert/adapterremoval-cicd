@@ -1,0 +1,17 @@
+{
+  "arguments": [
+    "--report-only",
+    "--out-json",
+    "report_se.json",
+    "--qualitybase",
+    "33"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "json": [
+      "report_se.json"
+    ]
+  }
+}

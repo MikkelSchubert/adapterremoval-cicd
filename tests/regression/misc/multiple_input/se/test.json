@@ -1,0 +1,24 @@
+{
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "your_output"
+  ],
+  "files": {
+    "input_1": [
+      "input_1a.fastq",
+      "input_1b.fastq",
+      "input_1c.fastq"
+    ],
+    "output": [
+      "your_output.r1.fastq.gz"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "html": [
+      "your_output.html"
+    ]
+  }
+}

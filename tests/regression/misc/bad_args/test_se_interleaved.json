@@ -1,0 +1,17 @@
+{
+  "exhaustive": false,
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--interleaved"
+  ],
+  "return_code": 1,
+  "stderr": [
+    "Could not validate paired read names:"
+  ],
+  "files": {
+    "input_1": [
+      "input_1a.fastq"
+    ]
+  }
+}

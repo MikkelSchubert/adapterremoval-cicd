@@ -1,0 +1,21 @@
+{
+  "arguments": [
+    "--identify-adapters",
+    "--out-prefix",
+    "your_output"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "ignore": [
+      "your_output.html"
+    ]
+  }
+}

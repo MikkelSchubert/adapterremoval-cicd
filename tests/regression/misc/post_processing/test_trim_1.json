@@ -1,0 +1,18 @@
+{
+  "arguments": [
+    "--out-prefix",
+    "your_output"
+  ],
+  "return_code": 1,
+  "stderr": [
+    "invalid character 'X' found in FASTQ sequence"
+  ],
+  "files": {
+    "input_1": [
+      "input_1_invalid.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ]
+  }
+}

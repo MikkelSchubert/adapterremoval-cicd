@@ -1,0 +1,9 @@
+{
+  "inherit_from": "test_defaults.json",
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--threads",
+    "3"
+  ]
+}

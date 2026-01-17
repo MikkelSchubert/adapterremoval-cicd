@@ -1,0 +1,44 @@
+{
+  "$schema": "https://MikkelSchubert.github.io/adapterremoval/schemas/3.0.0-alpha3.json",
+  "meta": {
+    "version": "...str",
+    "command": "...[str]",
+    "runtime": "...float",
+    "timestamp": "...str"
+  },
+  "summary": {
+    "input": {
+      "reads": 0,
+      "bases": 0,
+      "mean_length": null,
+      "reads_sampled": 0,
+      "q20_rate": null,
+      "q30_rate": null,
+      "uncalled_rate": null,
+      "gc_content": null
+    },
+    "output": null
+  },
+  "input": {
+    "read1": {
+      "filenames": ["input_1.fastq"],
+      "input_reads": 0,
+      "output_reads": 0,
+      "reads_sampled": 0,
+      "lengths": [],
+      "quality_curves": null,
+      "content_curves": null,
+      "quality_scores": null,
+      "gc_content": null
+    },
+    "read2": null
+  },
+  "demultiplexing": null,
+  "processing": null,
+  "analyses": {
+    "duplication": null,
+    "insert_sizes": null,
+    "consensus_adapters": null
+  },
+  "output": null
+}

@@ -1,0 +1,28 @@
+{
+  "description": "Filtering by minimum length, all reads excluded",
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "your_output",
+    "--out-discarded",
+    "your_output.discarded.fastq",
+    "--min-length",
+    "999"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "output": [
+      "your_output.discarded.fastq",
+      "your_output.r1.fastq.gz"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "html": [
+      "your_output.html"
+    ]
+  }
+}

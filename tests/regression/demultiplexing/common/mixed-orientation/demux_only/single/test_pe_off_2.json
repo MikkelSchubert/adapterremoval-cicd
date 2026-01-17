@@ -1,0 +1,12 @@
+{
+  "arguments": [
+    "--out-prefix",
+    "out_off",
+    "--barcode-table",
+    "barcodes.txt",
+    "--demultiplex-only",
+    "--barcode-orientation",
+    "unspecified"
+  ],
+  "inherit_from": "test_pe_off_1.json"
+}

@@ -1,0 +1,27 @@
+{
+  "arguments": [
+    "--quality-trimming",
+    "per-base",
+    "--trim-ns",
+    "--trim-qualities",
+    "--out-prefix",
+    "output_5"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ],
+    "output": [
+      "output_5.r1.fastq.gz",
+      "output_5.r2.fastq.gz",
+      "output_5.singleton.fastq.gz"
+    ],
+    "ignore": [
+      "output_5.json",
+      "output_5.html"
+    ]
+  }
+}

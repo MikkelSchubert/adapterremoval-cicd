@@ -1,0 +1,15 @@
+{
+  "inherit_from": "test_defaults.json",
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "your_output",
+    "--out-discarded",
+    "your_output",
+    "--barcode-table",
+    "barcodes.txt",
+    "--threads",
+    "3"
+  ]
+}

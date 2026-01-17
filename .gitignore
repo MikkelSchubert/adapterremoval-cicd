@@ -1,0 +1,21 @@
+# Build, cache, and program folders
+/.cache
+/.venv
+/.vscode
+/build
+
+# Compilation Database - for clang-tidy
+compile_commands.json
+
+# AdapterRemoval output
+/examples/output*
+/examples/your_output.*
+/your_output.*
+
+# Linters
+.harper-dictionary.txt
+
+# Misc files
+*.patch
+*.gcov
+*~

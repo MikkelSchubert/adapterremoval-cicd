@@ -1,0 +1,41 @@
+{
+  "exhaustive": false,
+  "arguments": [
+    "--collapse",
+    "--out-discarded",
+    "disc.fq",
+    "--out-file1",
+    "out1.fq",
+    "--out-file2",
+    "out2.fq",
+    "--out-merged",
+    "oc.fq",
+    "--out-json",
+    "out.json",
+    "--out-singleton",
+    "singles.fq",
+    "--out-html",
+    "out.html"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ],
+    "output": [
+      "disc.fq",
+      "oc.fq",
+      "out1.fq",
+      "out2.fq",
+      "singles.fq"
+    ],
+    "json": [
+      "out.json"
+    ],
+    "html": [
+      "out.html"
+    ]
+  }
+}

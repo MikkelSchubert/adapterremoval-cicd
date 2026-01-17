@@ -1,0 +1,21 @@
+{
+  "description": "Processing 2 PE reads using --head",
+  "arguments": [
+    "--report-only",
+    "--out-json",
+    "head_2_pe.json",
+    "--head",
+    "2"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ],
+    "json": [
+      "head_2_pe.json"
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "description": "Demultiplexing of double-indexed SE reads using 1-3 threads",
+  "exhaustive": true,
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "your_output",
+    "--out-discarded",
+    "your_output",
+    "--barcode-table",
+    "barcodes.txt"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "barcodes": [
+      "barcodes.txt"
+    ],
+    "output": [
+      "your_output.sample_1.discarded.fastq.gz",
+      "your_output.sample_1.r1.fastq.gz",
+      "your_output.sample_2.discarded.fastq.gz",
+      "your_output.sample_2.r1.fastq.gz",
+      "your_output.unidentified.r1.fastq.gz"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "html": [
+      "your_output.html"
+    ]
+  }
+}

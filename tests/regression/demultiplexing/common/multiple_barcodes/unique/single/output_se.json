@@ -1,0 +1,34 @@
+{
+  "$schema": "https://MikkelSchubert.github.io/adapterremoval/schemas/3.0.0-alpha3.json",
+  "meta": {
+    "version": "...str",
+    "command": "...[str]",
+    "runtime": "...float",
+    "timestamp": "...str"
+  },
+  "summary": "...",
+  "input": "...",
+  "demultiplexing": {
+    "assigned_reads": 3,
+    "ambiguous_reads": 0,
+    "unassigned_reads": 1,
+    "samples": {
+      "sample_1": {
+        "barcodes": [
+          { "barcode1": "CTTGCCCT", "barcode2": "", "orientation": null, "reads": 1 },
+          { "barcode1": "CAAAACTA", "barcode2": "", "orientation": null, "reads": 1 }
+        ],
+        "output": "..."
+      },
+      "sample_2": {
+        "barcodes": [
+          { "barcode1": "CGCCGATG", "barcode2": "", "orientation": null, "reads": 1 }
+        ],
+        "output": "..."
+      }
+    }
+  },
+  "processing": "...",
+  "analyses": "...",
+  "output": "..."
+}

@@ -1,0 +1,26 @@
+{
+  "exhaustive": false,
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "your_output",
+    "--interleaved-output",
+    "--out-file1",
+    "interleaved.fastq"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "output": [
+      "interleaved.fastq"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "html": [
+      "your_output.html"
+    ]
+  }
+}

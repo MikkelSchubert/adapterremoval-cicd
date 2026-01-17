@@ -1,0 +1,25 @@
+{
+  "description": "Demultiplexed reads must be post processed and validated (mate )",
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--barcode-table",
+    "barcodes.txt",
+    "--demultiplex-only"
+  ],
+  "return_code": 1,
+  "stderr": [
+    "invalid character 'X' found in FASTQ sequence"
+  ],
+  "files": {
+    "barcodes": [
+      "barcodes.txt"
+    ],
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2_invalid.fastq"
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "description": "User-supplied prefixes must be added to trimmed and demultiplexed reads (SE)",
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--barcode-list",
+    "barcodes.txt",
+    "--out-prefix",
+    "your_output",
+    "--out-discarded",
+    "your_output",
+    "--prefix-read1",
+    "R1_",
+    "--min-length",
+    "30"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "barcodes": [
+      "barcodes.txt"
+    ],
+    "output": [
+      "your_output.sample_1.discarded.fastq.gz",
+      "your_output.sample_1.r1.fastq.gz",
+      "your_output.unidentified.r1.fastq.gz"
+    ],
+    "ignore": [
+      "your_output.json",
+      "your_output.html"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "exhaustive": false,
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--interleaved-output",
+    "--out-file1",
+    "interleaved.fastq"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "input_2": [
+      "input_2.fastq"
+    ],
+    "output": [
+      "interleaved.fastq",
+      "your_output.singleton.fastq.gz"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "html": [
+      "your_output.html"
+    ]
+  }
+}

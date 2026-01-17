@@ -1,0 +1,24 @@
+{
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--quality-trimming",
+    "per-base",
+    "--trim-ns",
+    "--trim-qualities",
+    "--out-prefix",
+    "output_5"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "output": [
+      "output_5.r1.fastq.gz"
+    ],
+    "ignore": [
+      "output_5.json",
+      "output_5.html"
+    ]
+  }
+}

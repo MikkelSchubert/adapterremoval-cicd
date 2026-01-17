@@ -1,0 +1,32 @@
+{
+  "exhaustive": false,
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-discarded",
+    "disc.fq",
+    "--out-file1",
+    "out1.fq",
+    "--out-json",
+    "out.json",
+    "--out-singleton",
+    "singles.fq",
+    "--out-html",
+    "out.html"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "output": [
+      "disc.fq",
+      "out1.fq"
+    ],
+    "json": [
+      "out.json"
+    ],
+    "html": [
+      "out.html"
+    ]
+  }
+}

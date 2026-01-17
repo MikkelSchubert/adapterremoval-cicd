@@ -1,0 +1,27 @@
+{
+  "inherit_from": "test.json",
+  "arguments": [
+    "--collapse",
+    "--discarded",
+    "disc.fq",
+    "--output1",
+    "out1.fq",
+    "--output2",
+    "out2.fq",
+    "--outputcollapsed",
+    "oc.fq",
+    "--out-json",
+    "out.json",
+    "--singleton",
+    "singles.fq",
+    "--out-html",
+    "out.html"
+  ],
+  "stderr": [
+    "[WARNING] Option --discarded has been renamed to --out-discarded. Support for the old name will be removed in the future.",
+    "[WARNING] Option --output1 has been renamed to --out-file1. Support for the old name will be removed in the future.",
+    "[WARNING] Option --output2 has been renamed to --out-file2. Support for the old name will be removed in the future.",
+    "[WARNING] Option --outputcollapsed has been renamed to --out-merged. Support for the old name will be removed in the future.",
+    "[WARNING] Option --singleton has been renamed to --out-singleton. Support for the old name will be removed in the future."
+  ]
+}

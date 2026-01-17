@@ -1,0 +1,33 @@
+{
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--adapter2",
+    "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
+    "--out-prefix",
+    "your_output"
+  ],
+  "files": {
+    "input_1": [
+      "input_1a.fastq",
+      "input_1b.fastq",
+      "input_1c.fastq"
+    ],
+    "input_2": [
+      "input_2a.fastq",
+      "input_2b.fastq",
+      "input_2c.fastq"
+    ],
+    "output": [
+      "your_output.r1.fastq.gz",
+      "your_output.r2.fastq.gz",
+      "your_output.singleton.fastq.gz"
+    ],
+    "json": [
+      "your_output.json"
+    ],
+    "html": [
+      "your_output.html"
+    ]
+  }
+}

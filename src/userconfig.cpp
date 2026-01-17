@@ -1,0 +1,1966 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2011 Stinus Lindgreen <stinus@binf.ku.dk>
+// SPDX-FileCopyrightText: 2014 Mikkel Schubert <mikkelsch@gmail.com>
+#include "userconfig.hpp"       // declarations
+#include "adapter_database.hpp" // for adapter_database
+#include "adapter_detector.hpp" // for ADAPTER_DETECT_MIN_OVERLAP
+#include "alignment.hpp"        // for alignment_info
+#include "argparse.hpp"         // for parser, parse_result
+#include "commontypes.hpp"      // for string_vec, DEV_STDOUT, DEV_STDERR, ...
+#include "debug.hpp"            // for AR_REQUIRE, AR_FAIL
+#include "errors.hpp"           // for fastq_error
+#include "fastq_enc.hpp"        // for PHRED_SCORE_MAX
+#include "licenses.hpp"         // for LICENSES
+#include "logging.hpp"          // for log_stream, error, set_level, ...
+#include "output.hpp"           // for DEV_NULL, output_files, output_file
+#include "progress.hpp"         // for progress_type, progress_type::simple, ...
+#include "sequence.hpp"         // for dna_sequence
+#include "sequence_sets.hpp"    // for sample_set
+#include "simd.hpp"             // for size_t, name, supported, instruction_set
+#include "strutils.hpp"         // for shell_escape, str_to_u32
+#include "version.hpp"          // for name, version
+#include <algorithm>            // for find, max, min
+#include <array>                // for array
+#include <cerrno>               // for errno
+#include <cmath>                // for round
+#include <cstdlib>              // for getenv
+#include <cstring>              // for size_t, strerror, strcmp
+#include <exception>            // for exception
+#include <filesystem>           // for weakly_canonical
+#include <iostream>             // for cout
+#include <limits>               // for numeric_limits
+#include <memory>               // for unique_ptr, make_unique
+#include <stdexcept>            // for invalid_argument
+#include <string>               // for string, basic_string, operator==, ...
+#include <string_view>          // for string_view
+#include <tuple>                // for get, tuple
+#include <unistd.h>             // for access, isatty, R_OK, STDERR_FILENO
+
+namespace adapterremoval {
+
+namespace {
+
+const std::string_view HELPTEXT =
+  "AdapterRemoval searches for and removes remnant adapter sequences, poly-X "
+  "tails and low-quality base from FASTQ reads. See `man adapterremoval3` or "
+  "https://adapterremoval.readthedocs.io/ for more information\n"
+  "\n"
+  "For comments, suggestions, or other feedback please use\n"
+  "  https://github.com/MikkelSchubert/adapterremoval/issues/new\n"
+  "\n"
+  "If you use this program, then please cite Schubert et al. 2016:\n"
+  "  https://doi.org/10.1186/s13104-016-1900-2\n";
+
+////////////////////////////////////////////////////////////////////////////////
+// Helper functions
+
+std::pair<unsigned, unsigned>
+parse_trim_argument(const string_vec& values)
+{
+  unsigned mate_1 = 0;
+  unsigned mate_2 = 0;
+
+  switch (values.size()) {
+    case 1:
+      mate_1 = str_to_u32(values.front());
+      mate_2 = mate_1;
+      break;
+
+    case 2:
+      mate_1 = str_to_u32(values.front());
+      mate_2 = str_to_u32(values.back());
+      break;
+
+    default:
+      throw std::invalid_argument("please specify exactly one or two values");
+  }
+
+  return { mate_1, mate_2 };
+}
+
+bool
+parse_poly_x_option(const std::string& key,
+                    const string_vec& values,
+                    threadsafe_data<std::string>& sink)
+{
+  auto writer = sink.get_writer();
+  writer->clear();
+  if (values.empty()) {
+    *writer = "ACGT";
+    return true;
+  }
+
+  bool has_off_toggle = false;
+  bool has_auto_toggle = false;
+  bool has_nucleotides = false;
+  std::array<bool, ACGT::indices> enabled = {};
+  for (const auto& value : values) {
+    const auto normalized = to_upper(value);
+    if (normalized == "OFF") {
+      has_off_toggle = true;
+    } else if (normalized == "AUTO") {
+      has_auto_toggle = true;
+    } else {
+      for (const auto nuc : normalized) {
+        switch (nuc) {
+          case 'A':
+          case 'C':
+          case 'G':
+          case 'T':
+            has_nucleotides = true;
+            enabled.at(ACGT::to_index(nuc)) = true;
+            break;
+
+          default:
+            log::error() << "Option " << key << " called with invalid value "
+                         << shell_escape(value) << ". Only A, C, G, and T are "
+                         << "permitted, as well as 'auto' and 'off'";
+
+            return false;
+        }
+      }
+    }
+  }
+
+  if (has_auto_toggle + has_off_toggle + has_nucleotides > 1) {
+    log::error() << "Flags 'auto', 'off', or nucleotides (A, C, G, T) cannot "
+                    "be combined for option "
+                 << key << ". Use only one flag or only nucleotides";
+
+    return false;
+  } else if (has_auto_toggle) {
+    // replaced by `post_process_fastq`
+    *writer = "auto";
+  }
+
+  for (const auto nuc : ACGT::values) {
+    if (enabled.at(ACGT::to_index(nuc))) {
+      writer->push_back(nuc);
+    }
+  }
+
+  return true;
+}
+
+bool
+parse_counts(const argparse::parser& args,
+             const std::string& key,
+             uint64_t& out)
+{
+  const auto sink = args.value(std::string{ key });
+  if (sink.empty()) {
+    return true;
+  }
+
+  uint64_t unit = 1;
+  std::string sink_without_unit = sink;
+  if (sink.back() < '0' || sink.back() > '9') {
+    switch (sink.back()) {
+      case 'k':
+      case 'K':
+        unit = 1000;
+        break;
+
+      case 'm':
+      case 'M':
+        unit = 1000'000;
+        break;
+
+      case 'g':
+      case 'G':
+        unit = 1000'000'000;
+        break;
+
+      default:
+        log::error() << "Invalid unit in command-line option " << key
+                     << shell_escape(sink);
+        return false;
+    }
+
+    sink_without_unit.pop_back();
+  }
+
+  try {
+    // This should not be able to overflow as log2(2^32 * 1e9) ~= 62,
+    // but will need to be changed if we want to allow large raw numbers
+    out = static_cast<uint64_t>(str_to_u32(sink_without_unit)) * unit;
+  } catch (const std::invalid_argument&) {
+    log::error() << "Invalid value in command-line option --sink "
+                 << shell_escape(sink);
+    return false;
+  }
+
+  return true;
+}
+
+bool
+check_no_clobber(const std::string& label,
+                 const string_vec& in_files,
+                 const output_file& out_file)
+{
+  for (const auto& in_file : in_files) {
+    if (in_file == out_file.name && in_file != DEV_NULL) {
+      log::error() << "Input file would be overwritten: " << label << " "
+                   << in_file;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** Replace the STDIN pseudo-filename with the device path */
+void
+normalize_input_file(std::string& filename)
+{
+  if (filename == DEV_PIPE) {
+    filename = DEV_STDIN;
+  }
+}
+
+/** Replace the STDIN pseudo-filename with the device path */
+void
+normalize_output_file(std::string& filename)
+{
+  if (filename == DEV_PIPE) {
+    filename = DEV_STDOUT;
+  }
+}
+
+void
+append_normalized_input_files(string_pair_vec& out, const string_vec& filenames)
+{
+  for (const auto& filename : filenames) {
+    try {
+      out.emplace_back(std::filesystem::weakly_canonical(filename), filename);
+    } catch (const std::filesystem::filesystem_error&) {
+      // Permission errors are handled by the explicit access checks below
+      out.emplace_back(filename, filename);
+    }
+  }
+}
+
+bool
+check_input_files(const string_vec& filenames_1, const string_vec& filenames_2)
+{
+  string_pair_vec filenames;
+  append_normalized_input_files(filenames, filenames_1);
+  append_normalized_input_files(filenames, filenames_2);
+  std::sort(filenames.begin(), filenames.end());
+
+  bool any_errors = false;
+  for (size_t i = 1; i < filenames.size(); ++i) {
+    const auto& it_0 = filenames.at(i - 1);
+    const auto& it_1 = filenames.at(i);
+
+    if (it_0.second == it_1.second) {
+      log::error() << "Input file " << log_escape(it_0.second)
+                   << " has been specified multiple times using --in-file1 "
+                      "and/or --in-file2";
+      any_errors = true;
+    } else if (it_0.first == it_1.first) {
+      log::error() << "The path of input file " << log_escape(it_0.second)
+                   << " and the path of input " << "file "
+                   << log_escape(it_1.second) << " both point to the file "
+                   << log_escape(it_0.first);
+      any_errors = true;
+    }
+  }
+
+  for (const auto& it : filenames) {
+    if (access(it.second.c_str(), R_OK)) {
+      log::error() << "Cannot access input file " << log_escape(it.second)
+                   << ": " << std::strerror(errno);
+      any_errors = true;
+    }
+  }
+
+  return !any_errors;
+}
+
+bool
+check_output_files(const std::string& label,
+                   const string_vec& filenames,
+                   const output_files& output_files)
+{
+
+  if (!check_no_clobber(label, filenames, output_files.unidentified_1)) {
+    return false;
+  }
+
+  if (!check_no_clobber(label, filenames, output_files.unidentified_2)) {
+    return false;
+  }
+
+  for (const auto& sample : output_files.samples()) {
+    for (size_t i = 0; i < sample.size(); ++i) {
+      if (!check_no_clobber(label, filenames, sample.file(i))) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Tries to parse a simple command-line argument while ignoring the validity
+ * of the overall command-line. This is only intended to make pre-configured
+ * logging output consistent with post-configured output if possible.
+ */
+std::string
+try_parse_argument(const string_vec& args,
+                   const std::string& key,
+                   const std::string& fallback)
+{
+  auto it = std::find(args.begin(), args.end(), key);
+  if (it != args.end() && (it + 1) != args.end()) {
+    return *(it + 1);
+  }
+
+  return fallback;
+}
+
+/** Returns vector of keys for output files that have been set by the user. */
+string_vec
+user_supplied_keys(const argparse::parser& argparser, const string_vec& keys)
+{
+  string_vec result;
+  for (const auto& key : keys) {
+    if (argparser.is_set(key)) {
+      result.push_back(key);
+    }
+  }
+
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool
+fancy_output_allowed()
+{
+  if (::isatty(STDERR_FILENO)) {
+    // NO_COLOR is checked as suggested by https://no-color.org/
+    const char* no_color = std::getenv("NO_COLOR");
+    const char* term = std::getenv("TERM");
+
+    return !(no_color && no_color[0] != '\0') &&
+           !(term && strcmp(term, "dumb") == 0);
+  }
+
+  return false;
+}
+
+void
+configure_log_levels(const std::string& value, bool fallible = false)
+{
+  const auto log_level = to_lower(value);
+
+  if (log_level == "debug") {
+    log::set_level(log::level::debug);
+  } else if (log_level == "info") {
+    log::set_level(log::level::info);
+  } else if (log_level == "warning") {
+    log::set_level(log::level::warning);
+  } else if (log_level == "error") {
+    log::set_level(log::level::error);
+  } else {
+    AR_REQUIRE(fallible, "unhandled log_level value");
+  }
+}
+
+void
+configure_log_colors(const std::string& colors, bool fallible = false)
+{
+  if (colors == "always") {
+    log::set_colors(true);
+  } else if (colors == "never") {
+    log::set_colors(false);
+  } else if (colors == "auto") {
+    log::set_colors(fancy_output_allowed());
+  } else {
+    AR_REQUIRE(fallible, "unhandled log_colors value");
+  }
+}
+
+progress_type
+configure_log_progress(const std::string& progress)
+{
+  if (progress == "never") {
+    return progress_type::none;
+  } else if (progress == "spin") {
+    return progress_type::spinner;
+  } else if (progress == "log") {
+    return progress_type::simple;
+  } else if (progress == "auto") {
+    if (fancy_output_allowed()) {
+      return progress_type::spinner;
+    } else {
+      return progress_type::simple;
+    }
+  }
+
+  AR_FAIL("unhandled log_progress value");
+}
+
+fastq_encoding
+configure_encoding(const std::string& value,
+                   degenerate_encoding degenerate,
+                   uracil_encoding uracils)
+{
+  if (value == "33") {
+    return fastq_encoding{ quality_encoding::phred_33, degenerate, uracils };
+  } else if (value == "64") {
+    return fastq_encoding{ quality_encoding::phred_64, degenerate, uracils };
+  } else if (value == "solexa") {
+    return fastq_encoding{ quality_encoding::solexa, degenerate, uracils };
+  } else if (value == "sam") {
+    return fastq_encoding{ quality_encoding::sam, degenerate, uracils };
+  }
+
+  AR_FAIL("unhandled qualitybase value");
+}
+
+adapter_selection
+configure_adapter_selection(const std::string& value)
+{
+  if (value == "auto") {
+    return adapter_selection::automatic;
+  } else if (value == "manual") {
+    return adapter_selection::manual;
+  } else if (value == "undefined") {
+    return adapter_selection::undefined;
+  } else if (value == "none") {
+    return adapter_selection::none;
+  }
+
+  AR_FAIL("unhandled adapter_selection value");
+}
+
+adapter_fallback
+configure_adapter_fallback(const std::string& value)
+{
+  if (value == "abort") {
+    return adapter_fallback::abort;
+  } else if (value == "undefined") {
+    return adapter_fallback::undefined;
+  } else if (value == "none") {
+    return adapter_fallback::none;
+  }
+
+  AR_FAIL("unhandled adapter_fallback value");
+}
+
+bool
+parse_output_formats(const argparse::parser& argparser,
+                     output_format& file_format,
+                     output_format& stdout_format)
+{
+  if (argparser.is_set("--gzip")) {
+    file_format = stdout_format = output_format::fastq_gzip;
+    return true;
+  }
+
+  auto format_s = argparser.value("--out-format");
+  if (!output_files::parse_format(format_s, file_format)) {
+    log::error() << "Invalid output format " + log_escape(format_s);
+    return false;
+  }
+
+  // Default to writing uncompressed output to STDOUT
+  if (!argparser.is_set("--stdout-format")) {
+    switch (file_format) {
+      case output_format::fastq:
+      case output_format::fastq_gzip:
+        stdout_format = output_format::fastq;
+        return true;
+      case output_format::sam:
+      case output_format::sam_gzip:
+        stdout_format = output_format::sam;
+        return true;
+      case output_format::bam:
+      case output_format::ubam:
+        stdout_format = output_format::ubam;
+        return true;
+      default:
+        AR_FAIL("invalid output format");
+    }
+  }
+
+  format_s = argparser.value("--stdout-format");
+  if (!output_files::parse_format(format_s, stdout_format)) {
+    log::error() << "Invalid output format " + log_escape(format_s);
+    return false;
+  }
+
+  return true;
+}
+
+/** Parser for --mate-separator and --normalize-mate-separator */
+bool
+parse_mate_separator(const argparse::parser& argparser,
+                     std::string_view key,
+                     char& sink)
+{
+  if (argparser.is_set(key)) {
+    const auto value = argparser.value(key);
+
+    if (value.size() == 1) {
+      sink = value.at(0);
+    } else if (key == "--normalize-mate-separator" &&
+               to_lower(value) == "strip") {
+      sink = '\0';
+    } else {
+      log::error() << "The argument for " << key
+                   << " must be exactly one character long, not "
+                   << value.size() << " characters: " << log_escape(value);
+      return false;
+    }
+  } else {
+    sink = '\0';
+  }
+
+  return true;
+}
+
+} // namespace
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementations for `userconfig`
+
+userconfig::userconfig()
+  : samples()
+  , m_argparser(std::make_unique<argparse::parser>())
+{
+  auto& argparser = *m_argparser;
+  argparser.set_name(program::name());
+  argparser.set_version(program::long_version());
+  argparser.set_preamble(HELPTEXT);
+  argparser.set_licenses(LICENSES);
+  argparser.set_terminal_width(log::get_terminal_width());
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add("--threads", "N")
+    .help("Maximum number of threads")
+    .bind_u32(&max_threads)
+    .with_default(2)
+    .with_minimum(1);
+
+  {
+    std::vector<std::string> choices{ "auto" };
+    for (const auto is : simd::supported()) {
+      choices.emplace_back(simd::name(is));
+    }
+
+    AR_REQUIRE(!choices.empty());
+    argparser.add("--simd", "NAME")
+      .help("SIMD instruction set to use; when multiple SIMD instruction sets"
+            "are supported, attempt to auto-select the optimal instruction set "
+            "for the current data")
+      .bind_str(nullptr)
+      .with_choices(choices)
+      // SIMD implementations always appear to be faster than 'none', but on
+      // some systems AVX512 is for example not always faster than AVX2
+      .with_default(choices.size() <= 3 ? choices.back() : choices.front());
+  }
+
+  argparser.add("--benchmark")
+    .help("Carry out benchmarking of AdapterRemoval sub-systems")
+    .conflicts_with("--demultiplex-only")
+    .conflicts_with("--report-only")
+    .conflicts_with("--interleaved")
+    .conflicts_with("--interleaved-input")
+#if !defined(DEBUG)
+    .hidden()
+#endif
+    .bind_vec(&benchmarks)
+    .with_min_values(0);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("INPUT FILES:");
+
+  argparser.add("--in-file1", "FILE")
+    .help("One or more input files containing mate 1 reads [REQUIRED]")
+    .deprecated_alias("--file1")
+    .bind_vec(&input_files_1)
+    .with_preprocessor(normalize_input_file);
+  argparser.add("--in-file2", "FILE")
+    .help("Input files containing mate 2 reads; if used, then the same number "
+          "of files as --in-file1 must be listed [OPTIONAL]")
+    .deprecated_alias("--file2")
+    .bind_vec(&input_files_2)
+    .with_preprocessor(normalize_input_file);
+  argparser.add("--head", "N")
+    .help("Process only the first N reads in single-end mode or the first N "
+          "read-pairs in paired-end mode. Accepts suffixes K (thousands), M "
+          "(millions), and G (billions) [default: all reads]")
+    .bind_str(nullptr);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("OUTPUT FILES:");
+
+  argparser.add("--out-prefix", "PREFIX")
+    .help("Prefix for output files for which the corresponding --out option "
+          "was not set [default: not set]")
+    .deprecated_alias("--basename")
+    .bind_str(&out_prefix)
+    .with_default(DEV_NULL);
+
+  argparser.add_separator();
+  argparser.add("--out-file1", "FILE")
+    .help("Output file containing trimmed mate 1 reads. Setting this value in "
+          "in demultiplexing mode overrides --out-prefix for this file")
+    .deprecated_alias("--output1")
+    .bind_str(nullptr)
+    .with_default("{prefix}[.sample].r1.fastq")
+    .with_preprocessor(normalize_output_file);
+  argparser.add("--out-file2", "FILE")
+    .help("Output file containing trimmed mate 2 reads. Setting this value in "
+          "in demultiplexing mode overrides --out-prefix for this file")
+    .deprecated_alias("--output2")
+    .bind_str(nullptr)
+    .with_default("{prefix}[.sample].r2.fastq")
+    .with_preprocessor(normalize_output_file);
+  argparser.add("--out-merged", "FILE")
+    .help("Output file that, if --merge is set, contains overlapping "
+          "read-pairs that have been merged into a single read (PE mode only). "
+          "Setting this value in demultiplexing mode overrides --out-prefix "
+          "for this file")
+    .deprecated_alias("--outputcollapsed")
+    .bind_str(nullptr)
+    .with_default("{prefix}[.sample].merged.fastq")
+    .with_preprocessor(normalize_output_file);
+  argparser.add("--out-singleton", "FILE")
+    .help("Output file containing paired reads for which the mate has been "
+          "discarded. Setting this value in demultiplexing mode overrides "
+          "--out-prefix for this file")
+    .deprecated_alias("--singleton")
+    .bind_str(nullptr)
+    .with_default("{prefix}[.sample].singleton.fastq")
+    .with_preprocessor(normalize_output_file);
+
+  argparser.add_separator();
+  argparser.add("--out-unidentified1", "FILE")
+    .help("In demultiplexing mode, contains mate 1 reads that could not be "
+          "assigned to a single sample")
+    .bind_str(nullptr)
+    .with_default("{prefix}.unidentified.r1.fastq")
+    .with_preprocessor(normalize_output_file);
+  argparser.add("--out-unidentified2", "FILE")
+    .help("In demultiplexing mode, contains mate 2 reads that could not be "
+          "assigned to a single sample")
+    .bind_str(nullptr)
+    .with_default("{prefix}.unidentified.r2.fastq")
+    .with_preprocessor(normalize_output_file);
+  argparser.add("--out-discarded", "FILE")
+    .help("Output file containing filtered reads. Setting this value in "
+          "demultiplexing mode overrides --out-prefix for this file [default: "
+          "not saved]")
+    .deprecated_alias("--discarded")
+    .bind_str(nullptr)
+    .with_preprocessor(normalize_output_file);
+
+  argparser.add_separator();
+  argparser.add("--out-json", "FILE")
+    .help("Output file containing statistics about input files, trimming, "
+          "merging, and more in JSON format")
+    .bind_str(nullptr)
+    .with_default("{prefix}.json")
+    .with_preprocessor(normalize_output_file);
+  argparser.add("--out-html", "FILE")
+    .help("Output file containing statistics about input files, trimming, "
+          "merging, and more in HTML format")
+    .bind_str(nullptr)
+    .with_default("{prefix}.html")
+    .with_preprocessor(normalize_output_file);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("FASTQ OPTIONS:");
+
+  argparser.add("--quality-format", "N")
+    .help("Format used to encode Phred scores in input")
+    .deprecated_alias("--qualitybase")
+    .bind_str(&quality_input_base)
+    .with_choices({ "33", "64", "solexa", "sam" })
+    .with_default("33");
+  argparser.add("--mate-separator", "CHAR")
+    .help("Character separating the mate number (1 or 2) from the read name in "
+          "FASTQ records. Will be determined automatically if not specified")
+    .bind_str(nullptr);
+  argparser.add("--normalize-mate-separator", "CHAR")
+    .help("Replace the mate separator in FASTQ reads with the specified "
+          "character ('/' if no character is specified). If reads do not "
+          "contain mate numbers, these are added. If 'strip', the mate "
+          "separator is stripped from FASTQ reads")
+    .bind_str(nullptr)
+    .with_implicit_argument("/");
+
+  argparser.add("--interleaved-input")
+    .help("The (single) input file provided contains both the mate 1 and mate "
+          "2 reads, one pair after the other, with one mate 1 reads followed "
+          "by one mate 2 read. This option is implied by the --interleaved "
+          "option")
+    .conflicts_with("--in-file2")
+    .bind_bool(&interleaved_input);
+  argparser.add("--interleaved-output")
+    .help("If set, trimmed paired-end reads are written to a single file "
+          "containing mate 1 and mate 2 reads, one pair after the other. This "
+          "option is implied by the --interleaved option")
+    .conflicts_with("--out-file2")
+    .bind_bool(&interleaved_output);
+  argparser.add("--interleaved")
+    .help("This option enables both the --interleaved-input option and the "
+          "--interleaved-output option")
+    .conflicts_with("--in-file2")
+    .conflicts_with("--out-file2")
+    .bind_bool(&interleaved);
+
+  argparser.add("--mask-degenerate-bases")
+    .help("Mask degenerate/ambiguous bases (B/D/H/K/M/N/R/S/V/W/Y) in the "
+          "input by replacing them with an 'N'; if this option is not used, "
+          "AdapterRemoval will abort upon encountering degenerate bases");
+  argparser.add("--convert-uracils")
+    .help("Convert uracils (U) to thymine (T) in input reads; if this option "
+          "is not used, AdapterRemoval will abort upon encountering uracils");
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("OUTPUT FORMAT:");
+
+  argparser.add("--gzip")
+    .hidden()
+    .deprecated()
+    .conflicts_with("--out-format")
+    .conflicts_with("--stdout-format");
+  argparser.add("--out-format", "X")
+    .help("Selects the default output format; either 'fastq' for uncompressed "
+          "FASTQ reads, 'fastq.gz' for gzip compressed FASTQ reads, 'sam' for "
+          "uncompressed SAM records, 'sam.gz' for gzip compressed SAM records, "
+          "'bam' for BGZF compressed BAM records, and 'ubam' for uncompressed "
+          "BAM records. Setting an `--out-*` option overrides this option "
+          "based on the filename used (except .ubam)")
+    .bind_str(nullptr)
+    .with_choices({ "fastq", "fastq.gz", "sam", "sam.gz", "bam", "ubam" })
+    .with_default("fastq.gz");
+  argparser.add("--stdout-format", "X")
+    .help("Selects the output format for data written to STDOUT; choices are "
+          "the same as for --out-format [default: the same format as "
+          "--out-format, but uncompressed]")
+    .bind_str(nullptr)
+    .with_choices({ "fastq", "fastq.gz", "sam", "sam.gz", "bam", "ubam" });
+  argparser.add("--read-group", "RG")
+    .help("Add read-group to SAM/BAM output. Takes zero or more arguments in "
+          "the form 'tag:value' where tag consists of two alphanumerical "
+          "characters and where value is one or more characters. An argument "
+          "may also contain multiple, tab-separated tag/value pairs. An ID tag "
+          "is automatically generated if no ID tag is specified")
+    .bind_vec(&read_group)
+    .with_min_values(0);
+  argparser.add("--compression-level", "N")
+    .help("Sets the gzip compression level for compressed output. Level 0 is "
+          "uncompressed, but includes gzip headers and checksums; level 1 is "
+          "streamed when writing FASTQ/SAM files, which may be required for "
+          "compatibility in rare cases; and levels 2 to 12 and BAM output at "
+          "any level is block-compressed (BGZF)")
+    .deprecated_alias("--gzip-level")
+    .bind_u32(&compression_level)
+    .with_maximum(12)
+    .with_default(4);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("ADAPTER SELECTION:");
+
+  argparser.add("--adapter1", "SEQ")
+    .help("Adapter sequence expected to be found in mate 1 reads. Any 'N' in "
+          "this sequence is treated as a wildcard")
+    .bind_str(&adapter_1);
+  argparser.add("--adapter2", "SEQ")
+    .help("Adapter sequence expected to be found in mate 2 reads. Any 'N' in "
+          "this sequence is treated as a wildcard")
+    .bind_str(&adapter_2);
+  argparser.add("--adapter-table", "FILE")
+    .help("Read adapter pairs from the first two columns of a white-space "
+          "separated table. AdapterRemoval will then select the best matching "
+          "adapter pair for each pair of input reads when trimming. Only the "
+          "first column is required for single-end trimming")
+    .deprecated_alias("--adapter-list")
+    .conflicts_with("--adapter1")
+    .conflicts_with("--adapter2")
+    .bind_str(&adapter_table);
+
+  argparser.add("--adapter-selection", "X")
+    .help("How to select the adapters to trim: If 'auto', attempt to "
+          "determinate adapter sequences from the input data; if 'manual' use "
+          "the user-defined adapter sequences; if 'undefined' trim based on "
+          "overlap analyses (PE only) and/or 5' barcodes (SE if mate 2 "
+          "barcodes are are provided); and if 'none', assume that the data "
+          "contains no adapter sequences. Defaults to 'auto', unless "
+          "--adapter1, --adapter2, or --adapter-table are used, in which case "
+          "the default is 'manual'")
+    .bind_str(nullptr)
+    .with_choices({ "auto", "manual", "undefined", "none" });
+
+  argparser.add("--adapter-fallback", "X")
+    .help("If '--adapter-select auto' is used and no adapter sequences could "
+          "be identified, either 'abort' the program, or fall back to one of "
+          "the other possible --adapter-selection options [default: "
+          "'undefined' if possible, otherwise 'none']")
+    .bind_str(nullptr)
+    .with_choices({ "undefined", "none", "abort" })
+    .with_default("undefined");
+
+  argparser.add("--adapter-database", "FORMAT")
+    .help("Output TSV table/JSON file of adapters used for automatic adapter "
+          "selection. If adapter 2 is omitted, the same value is used for both "
+          "adapter 1 and adapter 2")
+    .bind_str(nullptr)
+    .with_choices({ "tsv", "json" });
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("PROCESSING:");
+
+  argparser.add_separator();
+  argparser.add("--min-adapter-overlap", "N")
+    .help("In single-end mode, reads are only trimmed if the overlap between "
+          "read and the adapter is at least X bases long, not counting "
+          "ambiguous nucleotides (Ns)")
+    .deprecated_alias("--minadapteroverlap")
+    .bind_u32(&min_adapter_overlap)
+    .with_default(1)
+    .with_minimum(1);
+  argparser.add("--mismatch-rate", "X")
+    .help("Max error-rate allowed when aligning reads and/or adapters")
+    .deprecated_alias("--mm")
+    .bind_double(&mismatch_threshold)
+    .with_default(0.1667);
+  argparser.add("--shift", "N")
+    .help("Consider alignments where up to N nucleotides are missing from the "
+          "5' termini")
+    .bind_u32(&shift)
+    .with_default(2);
+
+  argparser.add_separator();
+  argparser.add("--merge")
+    .help("When set, paired ended read alignments of --merge-threshold or "
+          "more bases are merged into a single consensus sequence. Merged "
+          "reads are written to prefix.merged by default. Has no effect "
+          "in single-end mode")
+    .deprecated_alias("--collapse");
+  argparser.add("--merge-threshold", "N")
+    .help("Paired reads must overlap at least this many bases to be considered "
+          "overlapping for the purpose of read merging. Overlapping bases "
+          "where one or both bases are ambiguous (N) are not counted")
+    .deprecated_alias("--minalignmentlength")
+    .bind_u32(&merge_threshold)
+    .with_default(11);
+  argparser.add("--merge-strategy", "X")
+    .help(
+      "The 'maximum' strategy uses Q=max(Q1,Q2) for matches while the "
+      "'additive' strategy uses Q=Q1+Q2. Both strategies use Q=abs(Q1-Q2) for "
+      "mismatches and picks the highest quality base, unless the qualities are "
+      "the same in which case 'N' is used. Setting this option implies --merge")
+    .bind_str(nullptr)
+    .with_choices({ "maximum", "additive" })
+    .with_default("maximum");
+  argparser.add("--merge-quality-max", "N")
+    .help("Sets the maximum Phred score for re-calculated quality scores when "
+          "read merging is enabled with the 'additive' merging strategy. The "
+          "value must be in the range 0 to 93, corresponding to Phred+33 "
+          "encoded values of '!' to '~'")
+    .deprecated_alias("--qualitymax")
+    .bind_u32(&merge_quality_max)
+    .with_maximum(PHRED_SCORE_MAX)
+    .with_default(41);
+  argparser.add("--collapse-deterministic")
+    .conflicts_with("--collapse-conservatively")
+    .conflicts_with("--merge-strategy")
+    .deprecated();
+  argparser.add("--collapse-conservatively")
+    .conflicts_with("--collapse-deterministic")
+    .conflicts_with("--merge-strategy")
+    .deprecated();
+
+  argparser.add_separator();
+  argparser.add("--prefix-read1", "X")
+    .help("Adds the specified prefix to read 1 names [default: no prefix]")
+    .bind_str(&prefix_read_1);
+  argparser.add("--prefix-read2", "X")
+    .help("Adds the specified prefix to read 2 names [default: no prefix]")
+    .bind_str(&prefix_read_2);
+  argparser.add("--prefix-merged", "X")
+    .help("Adds the specified prefix to merged read names [default: no prefix]")
+    .bind_str(&prefix_merged);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("QUALITY TRIMMING:");
+
+#ifdef PRE_TRIM_5P
+  argparser.add("--pre-trim5p", "N")
+    .help("Trim the 5' of reads by a fixed amount after demultiplexing (if "
+          "enabled) but before trimming adapters and low quality bases. "
+          "Specify one value to trim mate 1 and mate 2 reads the same amount, "
+          "or two values separated by a space to trim each mate a different "
+          "amount [default: no trimming]")
+    .bind_vec(&pre_trim5p)
+    .with_max_values(2);
+#endif
+  argparser.add("--pre-trim3p", "N")
+    .help("Trim the 3' of reads by a fixed amount after demultiplexing (if "
+          "enabled) but before trimming adapters and low quality bases. "
+          "Specify one value to trim mate 1 and mate 2 reads the same amount, "
+          "or two values separated by a space to trim each mate a different "
+          "amount [default: no trimming]")
+    .bind_vec(&pre_trim3p)
+    .with_max_values(2);
+
+  argparser.add("--post-trim5p", "N")
+    .help("Trim the 5' by a fixed amount after removing adapters, but before "
+          "carrying out quality based trimming [default: no trimming]")
+    .deprecated_alias("--trim5p")
+    .bind_vec(&post_trim5p)
+    .with_max_values(2);
+  argparser.add("--post-trim3p", "N")
+    .deprecated_alias("--trim3p")
+    .help("Trim the 3' by a fixed amount after removing adapters, but before "
+          "carrying out quality based trimming [default: no trimming]")
+    .bind_vec(&post_trim3p)
+    .with_max_values(2);
+
+  argparser.add_separator();
+  argparser.add("--quality-trimming", "method")
+    .help("Strategy for trimming low quality bases: 'mott' for the modified "
+          "Mott's algorithm; 'window' for window based trimming; 'per-base' "
+          "for a per-base trimming of low quality base; and 'none' for no "
+          "trimming of low quality bases")
+    .deprecated_alias("--trim-strategy") // name used during v3 alpha 1
+    .bind_str(nullptr)
+    .with_choices({ "mott", "window", "per-base", "none" })
+    .with_default("mott");
+
+  argparser.add("--trim-mott-rate", "X")
+    .help("The inclusive threshold value used when trimming low-quality bases "
+          "using the modified Mott's algorithm. A value of zero disables "
+          "trimming")
+    .deprecated_alias("--trim-mott-quality")
+    .conflicts_with("--trim-windows")
+    .conflicts_with("--trim-ns")
+    .conflicts_with("--trim-qualities")
+    .conflicts_with("--trim-min-quality")
+    .bind_double(&trim_mott_rate)
+    .with_minimum(0.0)
+    .with_maximum(1.0)
+    .with_default(0.05);
+  argparser.add("--trim-windows", "X")
+    .help("Specifies the size of the window used for '--quality-trimming "
+          "window': If >= 1, this value will be used as the window size; if "
+          "the value is < 1, window size is the read length times this value. "
+          "If the resulting window size is 0 or larger than the read length, "
+          "the read length is used as the window size")
+    .deprecated_alias("--trimwindows")
+    .conflicts_with("--trim-mott-rate")
+    .conflicts_with("--trim-qualities")
+    .bind_double(&trim_window_length)
+    .with_minimum(0.0)
+    .with_default(0.1);
+  argparser.add("--trim-min-quality", "N")
+    .help("Inclusive minimum quality used when trimming low-quality bases with "
+          "--quality-trimming options 'window' and 'per-base'. The value must "
+          "be in the range 0 to 93, corresponding to Phred+33 encoded values "
+          "of '!' to '~'")
+    .deprecated_alias("--minquality")
+    .conflicts_with("--trim-mott-rate")
+    .bind_u32(&trim_quality_score)
+    .with_maximum(PHRED_SCORE_MAX)
+    .with_default(2);
+  argparser.add("--trim-ns")
+    .help("If set, trim ambiguous bases (N) at 5'/3' termini when using the "
+          "'window' or the 'per-base' trimming strategy")
+    .conflicts_with("--trim-mott-rate")
+    .deprecated_alias("--trimns")
+    .bind_bool(&trim_ambiguous_bases);
+  argparser.add("--trim-qualities")
+    .help("If set, trim low-quality bases (< --trim-min-quality) when using "
+          "the 'per-base' trimming strategy")
+    .deprecated_alias("--trimqualities")
+    .conflicts_with("--trim-mott-rate")
+    .conflicts_with("--trim-windows")
+    .bind_bool(&trim_low_quality_bases);
+
+  argparser.add_separator();
+  argparser.add("--pre-trim-polyx", "X")
+    .help("Enable trimming of poly-X tails prior to read alignment and adapter "
+          "trimming. Zero or more nucleotides may be specified after the "
+          "option, with zero nucleotides corresponding to all of A, C, G, and "
+          "T. The value 'auto' may be used to trim G-tails from known 2-color "
+          "systems, and 'off' to disable poly-X trimming [default: auto]")
+    .bind_vec(&pre_trim_poly_x_sink)
+    .with_min_values(0);
+  argparser.add("--post-trim-polyx", "X")
+    .help("Enable trimming of poly-X tails after read alignment and adapter "
+          "trimming/merging, but before trimming of low-quality bases. Merged "
+          "reads are not trimmed by this option, as both ends are 5'. See "
+          "--pre-trim-polyx for possible arguments [default: off]")
+    .bind_vec(&post_trim_poly_x_sink)
+    .with_min_values(0);
+  argparser.add("--trim-polyx-threshold", "N")
+    .help("The minimum number of bases in a poly-X tail")
+    .bind_u32(&trim_poly_x_threshold)
+    .with_default(10);
+
+  argparser.add_separator();
+  argparser.add("--preserve5p")
+    .help("If set, bases at the 5p will not be trimmed by when performing "
+          "quality based trimming of reads. Merged reads will not be quality "
+          "trimmed when this option is enabled [default: 5p bases are trimmed]")
+    .bind_bool(&preserve5p);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("FILTERING:");
+
+  argparser.add("--max-ns", "N")
+    .help("Reads containing more ambiguous bases (N) than this number after "
+          "trimming are discarded [default: no maximum]")
+    .deprecated_alias("--maxns")
+    .bind_u32(&max_ambiguous_bases)
+    .with_default(std::numeric_limits<uint32_t>::max());
+
+  argparser.add("--min-length", "N")
+    .help("Reads shorter than this length following trimming are discarded")
+    .deprecated_alias("--minlength")
+    .bind_u32(&min_genomic_length)
+    .with_default(15);
+  argparser.add("--max-length", "N")
+    .help("Reads longer than this length following trimming are discarded "
+          "[default: no maximum]")
+    .deprecated_alias("--maxlength")
+    .bind_u32(&max_genomic_length)
+    .with_default(std::numeric_limits<uint32_t>::max());
+
+  argparser.add("--min-mean-quality", "N")
+    .help("Reads with a mean Phred quality score less than this value "
+          "following trimming are discarded. The value must be in the range 0 "
+          "to 93, corresponding to Phred+33 encoded values of '!' to '~' "
+          "[default: no minimum]")
+    .bind_double(&min_mean_quality)
+    .with_minimum(0.0)
+    .with_maximum(PHRED_SCORE_MAX)
+    .with_default(0.0);
+
+  argparser.add("--min-complexity", "X")
+    .help(
+      "Filter reads with a complexity score less than this value. Complexity "
+      "is measured as the fraction of positions that differ from the previous "
+      "position. A suggested value is 0.3 [default: no minimum]")
+    .bind_double(&min_complexity)
+    .with_minimum(0.0)
+    .with_maximum(1.0)
+    .with_default(0);
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("DEMULTIPLEXING:");
+
+  argparser.add("--barcode-table", "FILE")
+    .help("Read barcodes for demultiplexing from a whitespace separated table, "
+          "where each row contains a sample name, and one or two barcode "
+          "sequences. Both barcodes should be specified, if double-indexed "
+          "multiplexing was used, in order to ensure that both SE and PE reads "
+          "can be trimmed correctly")
+    .deprecated_alias("--barcode-list")
+    .bind_str(&barcode_table);
+  argparser.add("--multiple-barcodes")
+    .help("Allow for more than one barcode (pair) for each sample. If this "
+          "option is not specified, AdapterRemoval will abort if multiple "
+          "barcodes/barcode pairs identify the same sample");
+  argparser.add("--barcode-orientation", "X")
+    .help("Detect barcodes in both the barcode1-insert-barcode2 (forward) "
+          "orientation and barcode2-insert-barcode1 (reverse) orientation. "
+          "Takes an optional argument specifying the orientation of the "
+          "barcodes in the `--barcode-table`, defaulting to `forward`")
+    .deprecated_alias("--reversible-barcodes")
+    .depends_on("--barcode-table")
+    .bind_str(nullptr)
+    .with_default("unspecified")
+    .with_implicit_argument("forward")
+    .with_choices({ "unspecified", "forward", "reverse", "explicit" });
+  argparser.add("--normalize-orientation")
+    .help("Reverse complement merged reads found to be in the reverse "
+          "orientation, based on barcodes")
+    .depends_on("--barcode-orientation")
+    .depends_on("--merge")
+    .bind_bool(&normalize_orientation);
+
+  argparser.add_separator();
+  argparser.add("--barcode-mm", "N")
+    .help("Maximum number of mismatches allowed when counting mismatches in "
+          "both the mate 1 and the mate 2 barcode for paired reads")
+    .bind_u32(&barcode_mm)
+    .with_default(0);
+  argparser.add("--barcode-mm-r1", "N")
+    .help("Maximum number of mismatches allowed for the mate 1 barcode. "
+          "Cannot be higher than the --barcode-mm value [default: same value "
+          "as --barcode-mm]")
+    .bind_u32(&barcode_mm_r1)
+    .with_default(0);
+  argparser.add("--barcode-mm-r2", "N")
+    .help("Maximum number of mismatches allowed for the mate 2 barcode. "
+          "Cannot be higher than the --barcode-mm value [default: same value "
+          "as --barcode-mm]")
+    .bind_u32(&barcode_mm_r2)
+    .with_default(0);
+  argparser.add("--demultiplex-only")
+    .help("Only carry out demultiplexing using the list of barcodes "
+          "supplied with --barcode-table. No other processing is done")
+    .depends_on("--barcode-table")
+    .conflicts_with("--report-only");
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("REPORTS:");
+
+  argparser.add("--report-only")
+    .help("Write a report of the input data without performing any processing "
+          "of the FASTQ reads. Adapter sequence inference is performed for PE "
+          "data based on overlapping mate reads. A report including read "
+          "processing, but without output, can be generated by setting "
+          "--output options to /dev/null")
+    .deprecated_alias("--identify-adapters")
+    .conflicts_with("--barcode-table")
+    .conflicts_with("--benchmark")
+    .conflicts_with("--demultiplex-only");
+
+  argparser.add("--report-title", "X")
+    .help("Title used for HTML report")
+    .bind_str(&report_title)
+    .with_default(program::short_name());
+  argparser.add("--report-sample-rate", "X")
+    .help("Fraction of reads to use when generating base quality/composition "
+          "curves for trimming reports. Using all data (--report-sample-nth "
+          "1.0) results in an 10-30% decrease in throughput")
+    .bind_double(&report_sample_rate)
+    .with_minimum(0.0)
+    .with_maximum(1.0)
+    .with_default(0.1);
+  argparser.add("--report-duplication", "N")
+    .help("FastQC based duplicate detection, based on the frequency of the "
+          "first N unique sequences observed. If no value is given, an N of "
+          "100k is used, corresponding to FastQC defaults; a value of 0 "
+          "disables the analysis. Accepts suffixes K, M, and G")
+    .bind_str(nullptr)
+    .with_implicit_argument("100k");
+
+  //////////////////////////////////////////////////////////////////////////////
+  argparser.add_header("LOGGING:");
+
+  argparser.add("--log-level", "X")
+    .help("The minimum severity of messages to be written to STDERR")
+    .bind_str(&log_level)
+    .with_choices({ "debug", "info", "warning", "error" })
+    .with_default("info");
+
+  argparser.add("--log-colors", "X")
+    .help("Enable/disable the use of colors when writing log messages. If set "
+          "to auto, colors will only be enabled if STDERR is a terminal and "
+          "the NO_COLORS is environmental variable is not set")
+    .bind_str(&log_color)
+    .with_choices({ "auto", "always", "never" })
+    .with_default("auto");
+  argparser.add("--log-progress", "X")
+    .help("Specify the type of progress reports used. If set to auto, then a "
+          "spinner will be used if STDERR is a terminal and the NO_COLORS "
+          "environmental variable is not set, otherwise logging will be used")
+    .bind_str(nullptr)
+    .with_choices({ "auto", "log", "spin", "never" })
+    .with_default("auto");
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Removed options
+
+  argparser.add("--bzip2")
+    .help("BZip compression is no longer supported")
+    .removed();
+  argparser.add("--bzip2-level")
+    .help("BZip compression is no longer supported")
+    .removed();
+  argparser.add("--combined-output")
+    .help("Use the same filename with multiple '--out' options to combine "
+          "multiple output types in the same output file")
+    .removed();
+  argparser.add("--outputcollapsedtruncated")
+    .help("Truncated, merged reads are no longer handled separately from other "
+          "merged reads")
+    .removed();
+  argparser.add("--qualitybase-output")
+    .help("Output is now always written using Phred+33 encoding")
+    .removed();
+  argparser.add("--seed")
+    .help("All read processing is now deterministic. Use '--report-sample-rate "
+          "1.0' to make report generation deterministic")
+    .removed();
+  argparser.add("--settings")
+    .help("See --out-json or --out-html for machine and human readable reports")
+    .removed();
+}
+
+// Must be implemented out of line for unique ptrs
+userconfig::~userconfig() = default;
+
+argparse::parse_result
+userconfig::parse_args(const string_vec& argvec)
+{
+  args = argvec;
+  auto& argparser = *m_argparser;
+  if (args.size() <= 1) {
+    argparser.print_help();
+    return argparse::parse_result::error;
+  }
+
+  // ad-hoc arg parsing to make argparse output consistent with rest of run
+  configure_log_colors(try_parse_argument(args, "--log-color", "auto"), true);
+  configure_log_levels(try_parse_argument(args, "--log-level", "info"), true);
+
+  const argparse::parse_result result = argparser.parse_args(args);
+  if (result != argparse::parse_result::ok) {
+    return result;
+  } else if (argparser.is_set("--adapter-database")) {
+    const auto format_name = argparser.value("--adapter-database");
+    adapter_database::export_fmt format;
+    if (format_name == "tsv") {
+      format = adapter_database::export_fmt::tsv;
+    } else if (format_name == "json") {
+      format = adapter_database::export_fmt::json;
+    } else {
+      AR_FAIL("invalid --adapter-database argument");
+    }
+
+    std::cout << adapter_database::export_known(format) << std::endl;
+
+    return argparse::parse_result::exit;
+  }
+
+  configure_log_colors(log_color);
+  configure_log_levels(log_level);
+  log_progress = configure_log_progress(argparser.value("--log-progress"));
+
+  {
+    const auto degenerate = argparser.is_set("--mask-degenerate-bases")
+                              ? degenerate_encoding::mask
+                              : degenerate_encoding::reject;
+    const auto uracils = argparser.is_set("--convert-uracils")
+                           ? uracil_encoding::convert
+                           : uracil_encoding::reject;
+
+    io_encoding = configure_encoding(quality_input_base, degenerate, uracils);
+  }
+
+  m_normalize_mate_separator = argparser.is_set("--normalize-mate-separator");
+  if (!parse_mate_separator(argparser,
+                            "--mate-separator",
+                            input_mate_separator) ||
+      !parse_mate_separator(argparser,
+                            "--normalize-mate-separator",
+                            m_output_mate_separator)) {
+    return argparse::parse_result::error;
+  }
+
+  if (argparser.is_set("--demultiplex-only")) {
+    run_type = ar_command::demultiplex_only;
+  } else if (argparser.is_set("--report-only")) {
+    run_type = ar_command::report_only;
+  } else if (argparser.is_set("--benchmark")) {
+    run_type = ar_command::benchmark;
+  }
+
+  {
+    const auto strategy = argparser.value("--quality-trimming");
+    if (strategy == "mott") {
+      trim = trimming_strategy::mott;
+    } else if (strategy == "window") {
+      trim = trimming_strategy::window;
+    } else if (strategy == "per-base") {
+      trim = trimming_strategy::per_base;
+
+      if (!trim_low_quality_bases && !trim_ambiguous_bases) {
+        log::error() << "The per-base quality trimming strategy is enabled, "
+                     << "but neither trimming of low-quality bases (via "
+                     << "--trim-qualities) nor trimming of Ns (via --trim-ns) "
+                     << "is enabled.";
+        return argparse::parse_result::error;
+      }
+    } else if (strategy == "none") {
+      trim = trimming_strategy::none;
+    } else {
+      AR_FAIL(shell_escape(strategy));
+    }
+  }
+
+  // Check for invalid combinations of settings
+  if (input_files_1.empty() && input_files_2.empty()) {
+    log::error()
+      << "No input files (--in-file1 / --in-file2) specified.\n"
+      << "Please specify at least one input file using --in-file1 FILENAME.";
+
+    return argparse::parse_result::error;
+  } else if (!input_files_2.empty() &&
+             (input_files_1.size() != input_files_2.size())) {
+    log::error()
+      << "Different number of files specified for --in-file1 and --in-file2.";
+
+    return argparse::parse_result::error;
+  } else if (!input_files_2.empty()) {
+    paired_ended_mode = true;
+  }
+
+  interleaved_input |= interleaved;
+  interleaved_output |= interleaved;
+
+  if (interleaved_input) {
+    // Enable paired end mode .. other than the FASTQ reader, all other
+    // parts of the pipeline simply run in paired-end mode.
+    paired_ended_mode = true;
+  }
+
+  if (paired_ended_mode) {
+    // merge related options implies --merge
+    if (argparser.is_set("--collapse-deterministic")) {
+      merge = merge_strategy::additive;
+    } else if (argparser.is_set("--collapse-conservatively")) {
+      merge = merge_strategy::maximum;
+    } else if (argparser.is_set("--merge") ||
+               argparser.is_set("--merge-strategy")) {
+      const auto strategy = argparser.value("--merge-strategy");
+      if (strategy == "maximum") {
+        merge = merge_strategy::maximum;
+      } else if (strategy == "additive") {
+        merge = merge_strategy::additive;
+      } else {
+        AR_FAIL(strategy);
+      }
+    }
+  }
+
+  // (Optionally) read barcodes from file and validate. Must be done before
+  // setting up adapters, to allow the appropriate fallback to be selected.
+  if (!setup_demultiplexing()) {
+    return argparse::parse_result::error;
+  }
+
+  // (Optionally) read adapters from file and validate
+  if (!setup_adapter_sequences()) {
+    return argparse::parse_result::error;
+  }
+
+  if (argparser.is_set("--read-group")) {
+    auto merged_tags = join_text(read_group, "\t");
+
+    try {
+      samples.get_writer()->set_read_group(merged_tags);
+    } catch (const std::invalid_argument& error) {
+      log::error() << "Invalid argument --read-group "
+                   << log_escape(merged_tags) << ": " << error.what();
+
+      return argparse::parse_result::error;
+    }
+  }
+
+  // Set mismatch threshold
+  if (mismatch_threshold > 1) {
+    log::warn()
+      << "--mismatch-rate with values > 1 are deprecated; please use a value "
+         "in the range 0 to 0.5, e.g. '--mismatch-rate "
+      << std::round(1000.0 / mismatch_threshold) / 1000.0
+      << "'. This will be an error in the future.";
+
+    mismatch_threshold = 1.0 / mismatch_threshold;
+  } else if (mismatch_threshold > 0.5) {
+    log::warn() << "A --mismatch-rate value greater than 0.5 and less than or "
+                   "equal to 1.0 has no effect; this will be an error in the "
+                   "future.";
+  }
+
+  {
+    bool found = false;
+    const auto simd_choice = argparser.value("--simd");
+    const auto supported = simd::supported();
+    if (simd_choice == "auto") {
+      simd_auto_select = true;
+      *simd.get_writer() = supported.back();
+    } else {
+      for (const auto is : supported) {
+        if (simd_choice == simd::name(is)) {
+          *simd.get_writer() = is;
+          found = true;
+          break;
+        }
+      }
+
+      AR_REQUIRE(found);
+    }
+  }
+
+  using fixed_trimming =
+    std::tuple<const char*, const string_vec&, std::pair<unsigned, unsigned>&>;
+
+  const std::vector<fixed_trimming> fixed_trimming_options = {
+#ifdef PRE_TRIM_5P
+    { "--pre-trim5p", pre_trim5p, pre_trim_fixed_5p },
+#endif
+    { "--pre-trim3p", pre_trim3p, pre_trim_fixed_3p },
+    { "--post-trim5p", post_trim5p, post_trim_fixed_5p },
+    { "--post-trim3p", post_trim3p, post_trim_fixed_3p },
+  };
+
+  for (const auto& it : fixed_trimming_options) {
+    try {
+      if (argparser.is_set(std::get<0>(it))) {
+        std::get<2>(it) = parse_trim_argument(std::get<1>(it));
+      }
+    } catch (const std::invalid_argument& error) {
+      log::error() << "Could not parse " << std::get<0>(it)
+                   << " argument(s): " << error.what();
+
+      return argparse::parse_result::error;
+    }
+  }
+
+  if (!parse_output_formats(argparser, out_file_format, out_stdout_format)) {
+    return argparse::parse_result::error;
+  }
+
+  // An empty prefix or directory would results in the creation of dot-files
+  if (out_prefix.empty()) {
+    log::error() << "--out-prefix must be a non-empty value.";
+
+    return argparse::parse_result::error;
+  } else if (out_prefix.back() == '/') {
+    log::error() << "--out-prefix must not be a directory: "
+                 << shell_escape(out_prefix);
+
+    return argparse::parse_result::error;
+  } else if (out_prefix == DEV_NULL && run_type != ar_command::benchmark) {
+    // Relevant output options depend on input files and other settings
+    const std::vector<std::pair<std::string, bool>> output_keys = {
+      { "--out-file1",
+        is_adapter_trimming_enabled() || is_demultiplexing_enabled() },
+      { "--out-file2",
+        is_adapter_trimming_enabled() || is_demultiplexing_enabled() },
+      { "--out-singleton", is_adapter_trimming_enabled() },
+      { "--out-merged", is_read_merging_enabled() },
+      { "--out-discarded", is_adapter_trimming_enabled() },
+      { "--out-unidentified1", is_demultiplexing_enabled() },
+      { "--out-unidentified2", is_demultiplexing_enabled() },
+      { "--out-json", true },
+      { "--out-html", true },
+      { "--out-prefix", true },
+    };
+
+    string_vec required_keys;
+    for (const auto& it : output_keys) {
+      if (it.second) {
+        required_keys.push_back(it.first);
+      }
+    }
+
+    const auto user_keys = user_supplied_keys(argparser, required_keys);
+    if (user_keys.empty()) {
+      auto error = log::error();
+      error << "No output would be generated; at least one of the options "
+            << join_text(required_keys, ", ", ", or ")
+            << " must be used. The --out-prefix option automatically enables "
+               "all relevant --out options.";
+
+      return argparse::parse_result::error;
+    }
+  }
+
+  {
+    const std::string key = "--pre-trim-polyx";
+    if (!argparser.is_set(key)) {
+      pre_trim_poly_x_sink.emplace_back("auto");
+    }
+
+    if (!parse_poly_x_option(key, pre_trim_poly_x_sink, pre_trim_poly_x)) {
+      return argparse::parse_result::error;
+    }
+  }
+
+  {
+    const std::string key = "--post-trim-polyx";
+    if (argparser.is_set(key) &&
+        !parse_poly_x_option(key, post_trim_poly_x_sink, post_trim_poly_x)) {
+      return argparse::parse_result::error;
+    }
+  }
+
+  if (!min_genomic_length) {
+    log::warn() << "--min-length is set to 0. This may produce FASTQ files "
+                   "that are incompatible with some tools!";
+  }
+
+  // Default to all reads, but don't print value with --help
+  head = std::numeric_limits<uint64_t>::max();
+  if (!parse_counts(argparser, "--head", head)) {
+    return argparse::parse_result::error;
+  }
+
+  if (!parse_counts(argparser, "--report-duplication", report_duplication)) {
+    return argparse::parse_result::error;
+  }
+
+  return argparse::parse_result::ok;
+}
+
+output_format
+userconfig::infer_output_format(std::string_view filename) const
+{
+  if (filename == DEV_STDOUT) {
+    return out_stdout_format;
+  }
+
+  output_format result = out_file_format;
+  // Parse failures are ignored here; default to --out-format
+  output_files::parse_extension(filename, result);
+
+  return result;
+}
+
+output_files
+userconfig::get_output_filenames() const
+{
+  output_files files;
+
+  files.settings_json = new_output_file("--out-json", {}, {}, ".json").name;
+  files.settings_html = new_output_file("--out-html", {}, {}, ".html").name;
+
+  auto ext = output_files::file_extension(out_file_format);
+  std::string_view out1 = interleaved_output ? "" : ".r1";
+  std::string_view out2 = interleaved_output ? "" : ".r2";
+
+  if (is_demultiplexing_enabled()) {
+    files.unidentified_1 = new_output_file("--out-unidentified1",
+                                           {},
+                                           { ".unidentified", out1 },
+                                           ext);
+
+    if (paired_ended_mode) {
+      if (interleaved_output) {
+        files.unidentified_2 = files.unidentified_1;
+      } else {
+        files.unidentified_2 = new_output_file("--out-unidentified2",
+                                               {},
+                                               { ".unidentified", out2 },
+                                               ext);
+      }
+    }
+  }
+
+  auto reader = samples.get_reader();
+  for (const auto& sample : *reader) {
+    const auto& name = sample.name();
+    sample_output_files map;
+
+    const auto mate_1 = new_output_file("--out-file1", name, { out1 }, ext);
+    map.set_file(read_file::mate_1, mate_1);
+
+    if (paired_ended_mode) {
+      if (interleaved_output) {
+        map.set_file(read_file::mate_2, mate_1);
+      } else {
+        map.set_file(read_file::mate_2,
+                     new_output_file("--out-file2", name, { out2 }, ext));
+      }
+    }
+
+    if (run_type == ar_command::trim_adapters) {
+      map.set_file(
+        read_file::discarded,
+        new_output_file("--out-discarded", name, { ".discarded" }, ext));
+
+      if (paired_ended_mode) {
+        map.set_file(
+          read_file::singleton,
+          new_output_file("--out-singleton", name, { ".singleton" }, ext));
+
+        if (is_read_merging_enabled()) {
+          map.set_file(
+            read_file::merged,
+            new_output_file("--out-merged", name, { ".merged" }, ext));
+        }
+      }
+    }
+
+    files.add_sample(std::move(map));
+  }
+
+  return files;
+}
+
+output_file
+userconfig::new_output_file(std::string_view key,
+                            std::string_view sample,
+                            std::vector<std::string_view> keys,
+                            std::string_view ext) const
+{
+  AR_REQUIRE(!ext.empty());
+  const auto default_is_fastq = out_file_format == output_format::fastq ||
+                                out_file_format == output_format::fastq_gzip;
+
+  std::string out;
+  if (m_argparser->is_set(key)) {
+    out = m_argparser->value(key);
+
+    // global files, e.g. reports and unidentified reads
+    if (sample.empty()) {
+      return { out, infer_output_format(out) };
+    }
+  } else if (default_is_fastq && key == "--out-discarded") {
+    // Discarded reads are dropped by default for non-archival formats
+    out = DEV_NULL;
+  } else {
+    out = out_prefix;
+  }
+
+  if (out == DEV_NULL) {
+    return { out, output_format::fastq };
+  }
+
+  if (!(default_is_fastq || keys.empty())) {
+    // SAM/BAM files are combined by default
+    keys.pop_back();
+  }
+
+  if (!sample.empty()) {
+    keys.insert(keys.begin(), sample);
+  }
+
+  keys.emplace_back(ext);
+
+  for (const auto& value : keys) {
+    if (!value.empty() && value.front() != '.') {
+      out.push_back('.');
+    }
+
+    out.append(value);
+  }
+
+  return output_file{ out, infer_output_format(out) };
+}
+
+bool
+check_and_set_barcode_mm(const argparse::parser& argparser,
+                         const std::string& key,
+                         uint32_t barcode_mm,
+                         uint32_t& dst)
+{
+  if (!argparser.is_set(key)) {
+    dst = barcode_mm;
+  } else if (dst > barcode_mm) {
+    log::error()
+      << "The maximum number of errors for " << key
+      << " is set \n"
+         "to a higher value than the total number of mismatches allowed\n"
+         "for barcodes (--barcode-mm). Please correct these settings.";
+    return false;
+  }
+
+  return true;
+}
+
+adapter_database
+userconfig::known_adapters() const
+{
+  adapter_database adapters;
+  adapters.add_known();
+
+  // Duplicates are automatically ignored, so just add the default sequences
+  adapters.add(samples.get_reader()->uninitialized_adapters());
+
+  return adapters;
+}
+
+bool
+userconfig::is_adapter_trimming_enabled() const
+{
+  return run_type == ar_command::trim_adapters;
+}
+
+bool
+userconfig::is_demultiplexing_enabled() const
+{
+  return !barcode_table.empty();
+}
+
+bool
+userconfig::is_read_merging_enabled() const
+{
+  return is_adapter_trimming_enabled() && merge != merge_strategy::none;
+}
+
+bool
+userconfig::is_any_quality_trimming_enabled() const
+{
+  return is_adapter_trimming_enabled() &&
+         (is_low_quality_trimming_enabled() ||
+          is_terminal_base_pre_trimming_enabled() ||
+          is_terminal_base_post_trimming_enabled() ||
+          is_poly_x_tail_pre_trimming_enabled() ||
+          is_poly_x_tail_post_trimming_enabled());
+}
+
+bool
+userconfig::is_low_quality_trimming_enabled() const
+{
+  return trim != trimming_strategy::none;
+}
+
+bool
+userconfig::is_terminal_base_pre_trimming_enabled() const
+{
+  return
+#ifdef PRE_TRIM_5P
+    pre_trim_fixed_5p.first || pre_trim_fixed_5p.second ||
+#endif
+    pre_trim_fixed_3p.first || pre_trim_fixed_3p.second;
+}
+
+bool
+userconfig::is_terminal_base_post_trimming_enabled() const
+{
+  return post_trim_fixed_5p.first || post_trim_fixed_5p.second ||
+         post_trim_fixed_3p.first || post_trim_fixed_3p.second;
+}
+
+bool
+userconfig::is_poly_x_tail_pre_trimming_enabled() const
+{
+  return !pre_trim_poly_x.get_reader()->empty();
+}
+
+bool
+userconfig::is_poly_x_tail_post_trimming_enabled() const
+{
+  return !post_trim_poly_x.get_reader()->empty();
+}
+
+bool
+userconfig::is_any_filtering_enabled() const
+{
+  return is_adapter_trimming_enabled() &&
+         (is_short_read_filtering_enabled() ||
+          is_long_read_filtering_enabled() ||
+          is_ambiguous_base_filtering_enabled() ||
+          is_mean_quality_filtering_enabled() ||
+          is_low_complexity_filtering_enabled());
+}
+
+bool
+userconfig::is_short_read_filtering_enabled() const
+{
+  return min_genomic_length > 0;
+}
+
+bool
+userconfig::is_long_read_filtering_enabled() const
+{
+  return max_genomic_length !=
+         std::numeric_limits<decltype(max_genomic_length)>::max();
+}
+
+bool
+userconfig::is_ambiguous_base_filtering_enabled() const
+{
+  return max_ambiguous_bases !=
+         std::numeric_limits<decltype(max_ambiguous_bases)>::max();
+}
+
+bool
+userconfig::is_mean_quality_filtering_enabled() const
+{
+  return min_mean_quality > 0;
+}
+
+bool
+userconfig::is_low_complexity_filtering_enabled() const
+{
+  return min_complexity > 0;
+}
+
+bool
+userconfig::setup_adapter_sequences()
+{
+  adapter_set adapters;
+  if (m_argparser->is_set("--adapter-table")) {
+    try {
+      adapters.load(adapter_table, paired_ended_mode);
+    } catch (const std::exception& error) {
+      log::error() << "Error reading adapters from "
+                   << log_escape(adapter_table) << ": " << error.what();
+      return false;
+    }
+
+    log::info() << "Read " << adapters.size()
+                << " adapters / adapter pairs from '" << adapter_table << "'";
+  } else {
+    try {
+      adapters.add(dna_sequence{ adapter_1 }, dna_sequence{ adapter_2 });
+    } catch (const fastq_error& error) {
+      log::error() << "Error parsing adapter sequence(s):\n"
+                   << "   " << error.what();
+
+      return false;
+    }
+  }
+
+  adapter_fallback_strategy =
+    configure_adapter_fallback(m_argparser->value("--adapter-fallback"));
+
+  // It is not possible to trim undefined (empty) adapter sequences in all cases
+  const bool can_use_undefined =
+    paired_ended_mode || !samples.get_reader()->at(0).at(0).barcode_2.empty();
+
+  if (run_type == ar_command::report_only) {
+    adapter_selection_strategy = adapter_selection::automatic;
+    adapter_fallback_strategy = adapter_fallback::none;
+  } else if (run_type == ar_command::benchmark) {
+    adapter_selection_strategy = adapter_selection::manual;
+    adapter_fallback_strategy = adapter_fallback::none;
+  } else if (m_argparser->is_set("--adapter-selection")) {
+    adapter_selection_strategy =
+      configure_adapter_selection(m_argparser->value("--adapter-selection"));
+
+    if (adapter_selection_strategy == adapter_selection::undefined &&
+        !can_use_undefined) {
+      // This check can be avoided by using '--adapter1 ""'
+      log::error() << "'--adapter-selection undefined' cannot be used in SE "
+                      "mode unless demultiplexing is enabled and mate 2 "
+                      "barcodes are specified. Use '--adapter-selection none' "
+                      "if this is intended";
+
+      return false;
+    }
+  } else if (m_argparser->is_set("--adapter1") ||
+             m_argparser->is_set("--adapter1")) {
+    if (adapter_1.empty() && !paired_ended_mode) {
+      log::warn() << "It is not possible to trim adapters from single-end "
+                     "reads if an empty --adapter1 sequence has been set; "
+                     "AdapterRemoval will asusume that no adapters can be "
+                     "found in the input. Use '--adapter-selection none' to "
+                     "explicitly enable this behavior and silence this warning";
+
+      adapter_selection_strategy = adapter_selection::none;
+    } else {
+      adapter_selection_strategy = adapter_selection::manual;
+    }
+  } else if (m_argparser->is_set("--adapter-table")) {
+    adapter_selection_strategy = adapter_selection::manual;
+  } else {
+    adapter_selection_strategy = adapter_selection::automatic;
+  }
+
+  if (adapter_selection_strategy == adapter_selection::none) {
+    adapters = adapter_set{}; // no adapters sequences
+  } else if (adapter_selection_strategy == adapter_selection::undefined) {
+    adapters = adapter_set{ { "", "" } }; // empty adapter sequences
+  } else if (adapter_selection_strategy == adapter_selection::manual) {
+    if (!m_argparser->is_set("--adapter1") &&
+        !m_argparser->is_set("--adapter2") &&
+        !m_argparser->is_set("--adapter-table")) {
+      // Probably a user error
+      log::error() << "Manual adapter selection chosen with "
+                      "'--adapter-selection manual', but no adapter sequences "
+                      "have been specified with --adapter1/--adapter2 or "
+                      "--adapter-table";
+
+      return false;
+    }
+  } else if (adapter_fallback_strategy == adapter_fallback::undefined) {
+    if (!can_use_undefined) {
+      // Don't warn unless the user has explicitly asked for 'undefined'
+      if (m_argparser->is_set("--adapter-fallback")) {
+        log::warn()
+          << "'--adapter-fallback undefined' cannot be used in SE mode "
+             "unless demultiplexing is enabled and mate 2 barcodes are "
+             "specified; using '--adapter-fallback none' instead";
+      }
+
+      adapter_fallback_strategy = adapter_fallback::none;
+    }
+  }
+
+  {
+    auto writer = samples.get_writer();
+    writer->set_adapters(std::move(adapters));
+
+    // Ensure that adapter sequences are not used until detection has completed
+    if (adapter_selection_strategy == adapter_selection::automatic) {
+      writer->flag_uninitialized_adapters();
+
+      const auto check_adapter = [&](const dna_sequence& seq) {
+        if (!seq.empty() && seq.length() < ADAPTER_DETECT_MIN_OVERLAP) {
+          log::warn() << "Adapter sequence " << log_escape(seq.as_string())
+                      << " is too short for automatic adapter selection: "
+                         "candidate sequences must be at least "
+                      << ADAPTER_DETECT_MIN_OVERLAP << " bp long";
+        }
+      };
+
+      for (const auto& it : writer->uninitialized_adapters()) {
+        check_adapter(it.first);
+        check_adapter(it.second);
+      }
+    }
+  }
+
+  return true;
+}
+
+bool
+userconfig::setup_demultiplexing()
+{
+  auto& argparser = *m_argparser;
+  if (!argparser.is_set("--barcode-mm")) {
+    barcode_mm = barcode_mm_r1 + barcode_mm_r2;
+  }
+
+  if (!check_and_set_barcode_mm(argparser,
+                                "--barcode-mm-r1",
+                                barcode_mm,
+                                barcode_mm_r1)) {
+    return false;
+  }
+
+  if (!check_and_set_barcode_mm(argparser,
+                                "--barcode-mm-r2",
+                                barcode_mm,
+                                barcode_mm_r2)) {
+    return false;
+  }
+
+  if (argparser.is_set("--barcode-table")) {
+    const auto orientation =
+      parse_table_orientation(argparser.value("--barcode-orientation"));
+
+    barcode_config config;
+    config.paired_end_mode(paired_ended_mode)
+      .allow_multiple_barcodes(argparser.is_set("--multiple-barcodes"))
+      .orientation(orientation);
+
+    auto writer = samples.get_writer();
+    try {
+      writer->load(barcode_table, config);
+    } catch (const std::exception& error) {
+      log::error() << "Error reading barcodes from "
+                   << log_escape(barcode_table) << ": " << error.what();
+      return false;
+    }
+
+    log::info() << "Read " << writer->size() << " sets of barcodes from "
+                << shell_escape(barcode_table);
+  }
+
+  const auto& output_files = get_output_filenames();
+
+  return check_input_files(input_files_1, input_files_2) &&
+         check_output_files("--in-file1", input_files_1, output_files) &&
+         check_output_files("--in-file2", input_files_2, output_files);
+}
+
+} // namespace adapterremoval

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://MikkelSchubert.github.io/adapterremoval/schemas/3.0.0-alpha3.json",
+  "meta": {
+    "version": "...str",
+    "command": "...[str]",
+    "runtime": "...float",
+    "timestamp": "...str"
+  },
+  "summary": {
+    "input": {
+      "reads": 0,
+      "bases": 0,
+      "mean_length": null,
+      "reads_sampled": 0,
+      "q20_rate": null,
+      "q30_rate": null,
+      "uncalled_rate": null,
+      "gc_content": null
+    },
+    "output": {
+      "reads": 0,
+      "bases": 0,
+      "mean_length": null,
+      "reads_sampled": 0,
+      "q20_rate": null,
+      "q30_rate": null,
+      "uncalled_rate": null,
+      "gc_content": null
+    }
+  },
+  "input": {
+    "read1": {
+      "filenames": ["input_1.fastq"],
+      "input_reads": 0,
+      "output_reads": 0,
+      "reads_sampled": 0,
+      "lengths": [],
+      "quality_curves": null,
+      "content_curves": null,
+      "quality_scores": null,
+      "gc_content": null
+    },
+    "read2": null
+  },
+  "demultiplexing": null,
+  "processing": [
+    {
+      "step": "adapters",
+      "action": "trim",
+      "reads": 0,
+      "bases": 0,
+      "adapter_list": [
+        { "adapter1": "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", "adapter2": "", "reads": 0, "bases": 0 }
+      ]
+    },
+    { "step": "low_quality", "action": "trim", "reads": 0, "bases": 0 },
+    { "step": "min_length", "action": "filter", "reads": 0, "bases": 0 }
+  ],
+  "analyses": {
+    "duplication": null,
+    "insert_sizes": null,
+    "consensus_adapters": null
+  },
+  "output": {
+    "read1": {
+      "filenames": ["your_output.r1.fastq.gz"],
+      "input_reads": 0,
+      "output_reads": 0,
+      "reads_sampled": 0,
+      "lengths": [],
+      "quality_curves": null,
+      "content_curves": null,
+      "quality_scores": null,
+      "gc_content": null
+    },
+    "read2": null,
+    "merged": null,
+    "unidentified1": null,
+    "unidentified2": null,
+    "singleton": null,
+    "discarded": {
+      "filenames": null,
+      "input_reads": 0,
+      "output_reads": 0,
+      "reads_sampled": 0,
+      "lengths": [],
+      "quality_curves": null,
+      "content_curves": null,
+      "quality_scores": null,
+      "gc_content": null
+    }
+  }
+}

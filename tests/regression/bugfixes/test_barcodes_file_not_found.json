@@ -1,0 +1,15 @@
+{
+  "description": "The barcode list not being found should be handled gracefully",
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--barcode-table",
+    "not_found.txt",
+    "--in-file1",
+    "/dev/null"
+  ],
+  "return_code": 1,
+  "stderr": [
+    "[ERROR] Error reading barcodes from 'not_found.txt': failed to open file "
+  ]
+}

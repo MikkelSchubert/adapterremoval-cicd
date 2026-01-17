@@ -1,0 +1,18 @@
+{
+  "description": "Processing 0 SE reads using --head",
+  "arguments": [
+    "--report-only",
+    "--out-json",
+    "head_0_se.json",
+    "--head",
+    "0"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "json": [
+      "head_0_se.json"
+    ]
+  }
+}

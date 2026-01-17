@@ -1,0 +1,20 @@
+{
+  "arguments": [
+    "--out-prefix",
+    "output",
+    "--barcode-table",
+    "barcodes_double.txt"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "barcodes": [
+      "barcodes_double.txt"
+    ]
+  },
+  "return_code": 1,
+  "stderr": [
+    "[ERROR] Error reading barcodes from 'barcodes_double.txt': Sample 'sample_1' (CTTGCCCT-ACGTTATT) and sample 'sample_3' (CTTGCCCT-TCGCTGCA) have overlapping barcodes. Note that AdapterRemoval cannot distinguish these barcodes in single-end mode, even though the second barcodes differ. Please remove any duplicate entries from the barcode table before continuing"
+  ]
+}

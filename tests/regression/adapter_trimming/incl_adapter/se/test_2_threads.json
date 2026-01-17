@@ -1,0 +1,11 @@
+{
+  "inherit_from": "test_defaults.json",
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "your_output",
+    "--threads",
+    "2"
+  ]
+}

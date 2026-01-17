@@ -1,0 +1,28 @@
+{
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "output",
+    "--barcode-table",
+    "barcodes.txt",
+    "--multiple-barcodes"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "barcodes": [
+      "barcodes.txt"
+    ],
+    "output": [
+      "output.sample_1.r1.fastq.gz",
+      "output.sample_2.r1.fastq.gz",
+      "output.unidentified.r1.fastq.gz"
+    ],
+    "ignore": [
+      "output.json",
+      "output.html"
+    ]
+  }
+}

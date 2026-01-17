@@ -1,0 +1,41 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-toml
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      # Should maybe be added, but causes some amount of churn
+      # - id: end-of-file-fixer
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, 2.3.x]
+      - id: trailing-whitespace
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: a8c7c3ac16eabd3b958952ea0d6bf1dceeab6411 # v19.1.2
+    hooks:
+      - id: clang-format
+        types_or: [c++, c]
+        args: ["--dry-run", "--Werror"]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 2c8dce6094fa2b4b668e74f694ca63ceffd38614 # v0.9.9
+    hooks:
+      - id: ruff
+      - id: ruff-format
+  - repo: https://github.com/codespell-project/codespell
+    rev: 63c8f8312b7559622c0d82815639671ae42132ac # v2.4.1
+    hooks:
+      - id: codespell
+  # Check that all version numbers correspond to that in meson.build
+  - repo: local
+    hooks:
+      - id: version-check
+        name: version-check
+        entry: python3 ./scripts/version_check.py
+        language: python
+        types: ["text"]

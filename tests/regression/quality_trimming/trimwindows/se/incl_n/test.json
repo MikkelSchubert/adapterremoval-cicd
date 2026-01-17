@@ -1,0 +1,25 @@
+{
+  "arguments": [
+    "--out-prefix",
+    "your_output",
+    "--quality-trimming",
+    "window",
+    "--trim-windows",
+    "4",
+    "--trim-min-quality",
+    "20",
+    "--trim-ns"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "output": [
+      "your_output.r1.fastq.gz"
+    ],
+    "ignore": [
+      "your_output.json",
+      "your_output.html"
+    ]
+  }
+}

@@ -1,0 +1,883 @@
+<!-- TEMPLATE: HEAD -->
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>{{TITLE}}</title>
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/purecss@2.1.0/build/pure-min.css'
+    integrity='sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH' crossorigin='anonymous'>
+  <script>
+    let vegaPlots = [];
+    function loadVegaPlots() {
+      while (vegaPlots.length) {
+        let info = vegaPlots.pop();
+        vegaEmbed(info[0], info[1]);
+      }
+    }
+
+    function addVegaPlot(el, schema) {
+      vegaPlots.push([el, schema]);
+    }
+
+    function addFrequencyPlot(el, width, x_axis, y_axis, legend, values) {
+      var schema = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "width": width,
+        "height": 250,
+        "padding": 5,
+        "autosize": "pad",
+        "encoding": {
+          "x": {
+            "title": x_axis,
+            "field": "x",
+            "type": "quantitative",
+            "axis": { "offset": 5 },
+          },
+        },
+        "layer": [
+          {
+            "encoding": {
+              "y": {
+                "title": y_axis,
+                "field": "y",
+                "type": "quantitative",
+                "axis": { "offset": 5, "minExtent": 40 }
+              },
+              "color": {
+                "field": "group",
+                "sort": null,
+                "legend": legend,
+              }
+            },
+            "layer": [
+              { "mark": "line" },
+              {
+                "transform": [{ "filter": { "param": "hover", "empty": false } }],
+                "mark": "point"
+              }
+            ]
+          },
+          {
+            "transform": [{ "pivot": "group", "value": "y", "groupby": ["x"] }],
+            "mark": { "type": "rule", "tooltip": { "content": "data" } },
+            "encoding": {
+              "opacity": {
+                "condition": { "value": 0.3, "param": "hover", "empty": false },
+                "value": 0
+              }
+            },
+            "params": [
+              {
+                "name": "hover",
+                "select": {
+                  "type": "point",
+                  "fields": ["x"],
+                  "nearest": true,
+                  "on": "mouseover",
+                  "clear": "mouseout"
+                }
+              }
+            ]
+          }
+        ],
+        "transform": [
+          { "flatten": ["y"] },
+          { "window": [{ "op": "row_number", "as": "x" }], "groupby": ["group"] },
+          { "calculate": "datum.x - 1 + (datum.offset)", "as": "x" },
+          { "joinaggregate": [{ "op": "sum", "field": "y", "as": "sum_y" }], "groupby": ["group"] },
+          { "calculate": "datum.y / max(1, datum.sum_y)", "as": "y" },
+        ],
+        "data": {
+          "values": values
+        }
+      };
+
+      addVegaPlot(el, schema);
+    }
+
+    function addLinePlotBase({ el, width, x_axis, x_axis_type, y_axis, values, transforms }) {
+      var schema = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "padding": 5,
+        "spec": {
+          "width": width,
+          "height": 250,
+          "encoding": {
+            "x": {
+              "title": x_axis,
+              "field": "x",
+              "type": x_axis_type,
+              "axis": { "offset": 5 }
+            }
+          },
+          "layer": [
+            {
+              "encoding": {
+                "y": {
+                  "title": y_axis,
+                  "field": "y",
+                  "type": "quantitative",
+                  "sort": null,
+                  "axis": { "offset": 5, "minExtent": 40 }
+                },
+                "color": {
+                  "field": "group",
+                  "sort": null,
+                  "legend": { "title": "Legend", "padding": 5 },
+                }
+              },
+              "layer": [
+                { "mark": "line" },
+                {
+                  "transform": [{ "filter": { "param": "hover", "empty": false } }],
+                  "mark": "point"
+                }
+              ]
+            },
+            {
+              "transform": [{ "pivot": "group", "value": "y", "groupby": ["x"] }],
+              "mark": { "type": "rule", "tooltip": { "content": "data" } },
+              "encoding": {
+                "opacity": {
+                  "condition": { "value": 0.3, "param": "hover", "empty": false },
+                  "value": 0
+                }
+              },
+              "params": [
+                {
+                  "name": "hover",
+                  "select": {
+                    "type": "point",
+                    "fields": ["x"],
+                    "nearest": true,
+                    "on": "mouseover",
+                    "clear": "mouseout"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "facet": { "field": "read", "type": "ordinal", "title": "", "sort": [] },
+        "columns": 2,
+        "transform": transforms,
+        "data": {
+          "values": values
+        }
+      };
+
+      addVegaPlot(el, schema);
+    }
+
+    function addLinePlot({ el, width, x_axis, y_axis, values }) {
+      addLinePlotBase({
+        el,
+        width,
+        x_axis,
+        x_axis_type: 'quantitative',
+        y_axis,
+        values,
+        'transforms': [
+          { "flatten": ["y"] },
+          { "window": [{ "op": "row_number", "as": "x" }], "groupby": ["read", "group"] },
+          { "calculate": "datum.x - 1 + (datum.offset)", "as": "x" },
+        ]
+      });
+    }
+
+    function toggleBarcodeRows() {
+      let mode = undefined;
+      let elems = Array.from(document.getElementsByClassName("multiple-barcodes"));
+      for (let i = 0; i < elems.length; ++i) {
+        let elem = elems[i];
+        if (mode === undefined) {
+          mode = (elem.style["display"] == "none" ? "" : "none");
+        }
+
+        elem.style["display"] = mode;
+      }
+    }
+
+    function onScriptError() {
+      let elems = Array.from(document.getElementsByClassName("loading"));
+      for (let i = 0; i < elems.length; ++i) {
+        let elem = elems[i].parentElement;
+
+        elem.classList = ["error"];
+        elem.innerHTML = "ERROR: Could not load Vega-lite; plotting is disabled!"
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega@5.21.0/build/vega.min.js"
+    integrity="sha384-s2nYi9D0FfKNopEKsfINeS1Ffhcf+5uvwIrb7Zqso2II+HPhzBTWvXClt+NdUwFc" crossorigin="anonymous"
+    onerror="onScriptError()"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega-lite@5.2.0/build/vega-lite.min.js"
+    integrity="sha384-tU6fj0fI2gxrcWwC7uBMp70QvipC9ukjcXyOs85VMmdCq33CrA7xQ3nJkJu0SmDm" crossorigin="anonymous"
+    onerror="onScriptError()"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega-embed@6.20.2/build/vega-embed.min.js"
+    integrity="sha384-oP1rwLY7weRZ5jvAVzfnJsAn+sYA69rQC4geH82Y9oMvr8ruA1oeE9Jkft2noCHR" crossorigin="anonymous"
+    onerror="onScriptError()"></script>
+  <style type='text/css'>
+    body {
+      background-color: #E3E2DE;
+    }
+
+    div#layout {
+      width: 920px;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: smaller;
+    }
+
+    div.title {
+      background-color: #8C9CC0;
+      margin: -10px !important;
+      text-align: center;
+      border-radius: 5px;
+    }
+
+    div.title>h1,
+    div.title>h2 {
+      padding: 5px;
+    }
+
+    h5 {
+      margin-bottom: 2px;
+      margin-left: 6px;
+    }
+
+    .pure-table {
+      margin-left: 1em;
+    }
+
+    .pure-table thead>tr>th {
+      text-align: center;
+      font-weight: bold;
+      background-color: #C4CCDB;
+    }
+
+    .summary-table tr>td:first-child {
+      font-weight: bold;
+    }
+
+    .io-table tr>td:first-child {
+      font-weight: bold;
+    }
+
+    .io-table tr>td:first-child {
+      min-width: 85px;
+    }
+
+    .io-table tr>td:not(:first-child) {
+      text-align: right;
+      min-width: 75px;
+    }
+
+    .trimming-table tr>td:nth-child(-n+3) {
+      font-weight: bold;
+    }
+
+    .trimming-table tr>td:nth-child(n+3) {
+      text-align: right;
+    }
+
+    .adapter-table tr>td:first-child {
+      font-weight: bold;
+    }
+
+    .kmer-table thead {
+      font-weight: bold;
+    }
+
+    .kmer-table tr>td:first-child {
+      font-weight: bold;
+    }
+
+    .kmer-table {
+      text-align: right;
+    }
+
+    .trimming-table tr>td:nth-child(4),
+    .trimming-table tr>td:nth-child(6),
+    .trimming-table tr>td:nth-child(8) {
+      min-width: 80px;
+    }
+
+    .trimming-table tr>td:nth-child(5),
+    .trimming-table tr>td:nth-child(7) {
+      min-width: 40px;
+    }
+
+    .trimming-table tr>td:nth-of-type(3) {
+      text-align: center;
+      min-width: 25px;
+    }
+
+    .barcode-table {
+      max-height: 300px;
+      overflow-y: scroll;
+    }
+
+    .barcode-table>table {
+      width: 875px;
+    }
+
+    .barcode-table tr>td:nth-child(3),
+    .barcode-table tr>td:nth-child(4),
+    .barcode-table tr>td:nth-child(5),
+    .barcode-table tr>td:nth-child(6),
+    .barcode-table tr>td:nth-child(7) {
+      text-align: right;
+    }
+
+    .barcode-table>table>thead>tr>th {
+      position: sticky;
+      top: 0;
+      box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+    }
+
+    .section {
+      background-color: #FFF;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      padding: 10px;
+      padding-top: 0px;
+    }
+
+    .note {
+      color: #777;
+      font-size: small;
+    }
+
+    .epilogue {
+      padding-top: 10px;
+    }
+
+    .anchor {
+      color: #104fc6;
+      font-size: smaller;
+      text-decoration: none;
+    }
+
+    .anchor:hover {
+      text-decoration: underline;
+    }
+
+    /** Error message on failure to load scripts */
+    .error {
+      color: #a11111;
+      font-size: larger;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    /** Spinner via https://loading.io/css/ (License: CC0) */
+    .loading {
+      color: #8C9CC0;
+    }
+
+    .loading,
+    .loading div {
+      box-sizing: border-box;
+    }
+
+    .loading {
+      display: block;
+      position: relative;
+      margin-left: auto;
+      margin-right: auto;
+      width: 80px;
+      height: 80px;
+    }
+
+    .loading div {
+      display: inline-block;
+      position: absolute;
+      left: 8px;
+      width: 16px;
+      background: currentColor;
+      animation: loading 1.2s cubic-bezier(0, 0.5, 0.5, 1) infinite;
+    }
+
+    .loading div:nth-child(1) {
+      left: 8px;
+      animation-delay: -0.24s;
+    }
+
+    .loading div:nth-child(2) {
+      left: 32px;
+      animation-delay: -0.12s;
+    }
+
+    .loading div:nth-child(3) {
+      left: 56px;
+      animation-delay: 0s;
+    }
+
+    @keyframes loading {
+      0% {
+        top: 8px;
+        height: 64px;
+      }
+
+      50%,
+      100% {
+        top: 24px;
+        height: 32px;
+      }
+    }
+  </style>
+</head>
+
+<!-- TEMPLATE: BODY_START -->
+
+<body onload="loadVegaPlots()">
+  <div id='layout'>
+    <div class="title">
+      <h1>{{TITLE}}</h1>
+    </div>
+
+    <!-- TEMPLATE: SUMMARY -->
+    <div class="section">
+      <div class="title" id="summary">
+        <h2>Summary <a class="anchor" href="#summary">#</a></h2>
+      </div>
+
+      <h4 id="summary-program">
+        Program <a class="anchor" href="#summary-program">#</a>
+      </h4>
+      <table class="pure-table pure-table-striped summary-table">
+        <tbody>
+          <tr>
+            <td>Date</td>
+            <td>{{DATE_AND_TIME}}</td>
+          </tr>
+          <tr>
+            <td>Command</td>
+            <td>{{COMMAND}}</td>
+          </tr>
+          <tr>
+            <td>Version</td>
+            <td>{{VERSION}}</td>
+          </tr>
+          <tr>
+            <td>Runtime</td>
+            <td>{{RUNTIME}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- TEMPLATE: SUMMARY_IO_HEAD -->
+      <h4 id="{{HREF}}">
+        {{TITLE}} <a class="anchor" href="#{{HREF}}">#</a>
+      </h4>
+      <table class="pure-table io-table pure-table-striped">
+        <thead>
+          <tr>
+            <th></th>
+            <th>#Reads</th>
+            <th>#Bases</th>
+            <th>Read length</th>
+            <th>Q20</th>
+            <th>Q30</th>
+            <th>GC</th>
+            <th>N</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- TEMPLATE: SUMMARY_IO_ROW -->
+          <tr>
+            <td>{{NAME}}</td>
+            <td>{{N_READS}}</td>
+            <td>{{N_BASES}}</td>
+            <td>{{LENGTHS}}</td>
+            <td>{{Q20}}</td>
+            <td>{{Q30}}</td>
+            <td>{{GC}}</td>
+            <td>{{NS}}</td>
+          </tr>
+          <!-- TEMPLATE: SUMMARY_IO_TAIL -->
+        </tbody>
+      </table>
+
+      <!-- TEMPLATE: SAMPLING_NOTE -->
+
+      <p class="note">
+        Base composition statistics/plots are based on {{READS}} ({{PCT}}) of {{LABEL}} reads sampled during
+        execution.
+      </p>
+
+      <!-- TEMPLATE: OUTPUT_NOTE -->
+
+      <p class="note">{{TEXT}}</p>
+
+      <!-- TEMPLATE: OUTPUT_FOOTNOTE -->
+
+      <p class="note"><b>{{SYMBOL}}</b> {{RAW_HTML}}</p>
+
+      <!-- TEMPLATE: SUMMARY_TRIMMING_HEAD -->
+      <h4 id="summary-process">
+        Process summary <a class="anchor" href="#summary-process">#</a>
+      </h4>
+      <table class="pure-table trimming-table pure-table-striped">
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th>Step</th>
+            <th></th>
+            <th>Reads</th>
+            <th>(%)</th>
+            <th>Bases</th>
+            <th>(%)</th>
+            <th>Mean Bases</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- TEMPLATE: SUMMARY_TRIMMING_ROW -->
+          <tr>
+            <td>{{STAGE}}</td>
+            <td>{{LABEL_1}}</td>
+            <td>{{LABEL_2}}</td>
+            <td>{{READS}}</td>
+            <td>{{PCT_READS}}</td>
+            <td>{{BASES}}</td>
+            <td>{{PCT_BASES}}</td>
+            <td>{{AVG_BASES}}</td>
+          </tr>
+          <!-- TEMPLATE: SUMMARY_TRIMMING_TAIL -->
+
+        </tbody>
+      </table>
+
+      <p class="note">
+        {{N_ENABLED_PROC}} of {{N_TOTAL_PROC}} processing steps enabled, {{N_ENABLED_FILT}} of {{N_TOTAL_FILT}}
+        filtering steps enabled. Numbers of reads are given in terms of input reads, meaning that a merged read
+        counts for two. For <b>Processing</b> and <b>Filtering</b>, the numbers of bases specify how many were
+        lost during each step.
+      </p>
+
+      <!-- TEMPLATE: DUPLICATION_HEAD -->
+      <h4 id="analyses-consensus-adapter">
+        Sequence duplication levels <a class="anchor" href="#sequence-duplication-levels">#</a>
+      </h4>
+
+      <!-- TEMPLATE: DUPLICATION_BODY_SE -->
+      <p class="note">
+        Estimated that {{PCT_UNIQUE}} of reads are unique.
+      </p>
+
+      <!-- TEMPLATE: DUPLICATION_BODY_PE -->
+      <p class="note">
+        Estimated that {{PCT_UNIQUE}} of reads are unique, including {{PCT_UNIQUE_1}} of mate 1 reads and
+        {{PCT_UNIQUE_2}} of mate 2 reads.
+      </p>
+
+      <!-- TEMPLATE: DUPLICATION_PLOT -->
+
+      <div id="vis_{{ID}}">
+        <div class="loading">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+
+      <script>
+        addLinePlotBase({
+          'el': '#vis_{{ID}}',
+          'width': JS_TEMPLATE_WIDTH,
+          'x_axis': 'Duplication levels',
+          'x_axis_type': 'ordinal',
+          'y_axis': 'Fraction',
+          'values': JS_TEMPLATE_VALUES
+        });
+        addVegaPlot('#vis_{{ID}}', schema);
+      </script>
+
+      <!-- TEMPLATE: CONSENSUS_ADAPTER_HEAD -->
+      <h4 id="analyses-consensus-adapter">
+        Consensus adapter sequences <a class="anchor" href="#analyses-consensus-adapter">#</a>
+      </h4>
+
+      <p class="note">
+        Found {{OVERLAPPING_PAIRS}} overlapping pairs of which {{PAIRS_WITH_ADAPTERS}} contained adapter
+        sequence(s).
+      </p>
+
+      <!-- TEMPLATE: CONSENSUS_ADAPTER_TABLE -->
+      <table class="pure-table adapter-table pure-table-striped" style="font-family: monospace;">
+        <tbody>
+          <tr>
+            <td>{{NAME_1}}</td>
+            <td>{{REFERENCE_1}}</td>
+            <td></td>
+            <td>{{NAME_2}}</td>
+            <td>{{REFERENCE_2}}</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>{{ALIGNMENT_1}}</td>
+            <td></td>
+            <td></td>
+            <td>{{ALIGNMENT_2}}</td>
+          </tr>
+          <tr>
+            <td>Consensus</td>
+            <td>{{CONSENSUS_1}}</td>
+            <td></td>
+            <td>Consensus</td>
+            <td>{{CONSENSUS_2}}</td>
+          </tr>
+          <tr>
+            <td>Qualities</td>
+            <td>{{QUALITIES_1}}</td>
+            <td></td>
+            <td>Qualities</td>
+            <td>{{QUALITIES_2}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- TEMPLATE: CONSENSUS_ADAPTER_KMER_HEAD -->
+      <h4 id="analyses-top-kmers">
+        Top {{N_KMERS}} most common {{KMER_LENGTH}}-bp 5' adapter kmers <a class="anchor"
+          href="#analyses-top-kmers">#</a>
+      </h4>
+
+      <table class="pure-table kmer-table pure-table-striped" style="font-family: monospace;">
+        <thead>
+          <tr>
+            <td></td>
+            <td>Adapter 1 k-mer</td>
+            <td>Count</td>
+            <td>%</td>
+            <td></td>
+            <td>Adapter 2 k-mer</td>
+            <td>Count</td>
+            <td>%</td>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- TEMPLATE: CONSENSUS_ADAPTER_KMER_ROW -->
+          <tr>
+            <td>{{INDEX}}</td>
+            <td>{{OPTIONAL_KMER_1}}</td>
+            <td>{{OPTIONAL_COUNT_1}}</td>
+            <td>{{OPTIONAL_PCT_1}}</td>
+            <td></td>
+            <td>{{OPTIONAL_KMER_2}}</td>
+            <td>{{OPTIONAL_COUNT_2}}</td>
+            <td>{{OPTIONAL_PCT_2}}</td>
+          </tr>
+          <!-- TEMPLATE: CONSENSUS_ADAPTER_KMER_TAIL -->
+        </tbody>
+      </table>
+
+      <!-- TEMPLATE: H2_TAG -->
+    </div>
+
+    <div class="section">
+      <div class="title">
+        <h2>{{TITLE}} <a class="anchor" id="{{HREF}}" href="#{{HREF}}">#</a></h2>
+      </div>
+
+      <!-- TEMPLATE: PLOT_TITLE -->
+      <h4 id="{{HREF}}">
+        {{TITLE}} <a class="anchor" href="#{{HREF}}">#</a>
+      </h4>
+
+      <!-- TEMPLATE: PLOT_SUB_TITLE -->
+      <div class="note">{{SUB_TITLE}}</div>
+
+      <!-- TEMPLATE: FREQUENCY_PLOT -->
+
+      <div id="vis_{{ID}}">
+        <div class="loading">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+
+      <script>
+        addFrequencyPlot('#vis_{{ID}}', JS_TEMPLATE_WIDTH, JS_DEFAULT_X_AXIS = null, JS_DEFAULT_Y_AXIS = null, JS_DEFAULT_LEGEND = "{ 'title': 'Legend', 'padding': 5 }", JS_TEMPLATE_VALUES);
+      </script>
+      <noscript class="error">
+        ERROR: Plots cannot be shown because JavaScript is disabled!
+      </noscript>
+
+      <!-- TEMPLATE: FACET_LINE_PLOT -->
+
+      <div id="vis_{{ID}}">
+        <div class="loading">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+
+      <script>
+        addLinePlot({
+          'el': '#vis_{{ID}}',
+          'width': JS_TEMPLATE_WIDTH,
+          'x_axis': JS_DEFAULT_X_AXIS = null,
+          'y_axis': JS_DEFAULT_Y_AXIS = null,
+          'values': JS_TEMPLATE_VALUES,
+        });
+      </script>
+      <noscript class="error">
+        ERROR: Plots cannot be shown because JavaScript is disabled!
+      </noscript>
+
+      <!-- TEMPLATE: BAR_PLOT -->
+
+      <div id="vis_{{ID}}">
+        <div class="loading">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+
+      <script>
+        var schema = {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "width": JS_TEMPLATE_WIDTH,
+          "height": 250,
+          "padding": 5,
+          "autosize": "pad",
+          "mark": { "type": "bar", "tooltip": true },
+          "encoding": {
+            "x": {
+              "title": JS_DEFAULT_X_AXIS = null,
+              "field": "sample",
+              "type": "nominal",
+              "title": "",
+              "axis": { "labels": false }
+            },
+            "y": {
+              "title": JS_DEFAULT_Y_AXIS = null,
+              "field": "pct",
+              "type": "quantitative",
+              "axis": { "offset": 5, "minExtent": 40 }
+            },
+            "color": { "field": "n", "legend": null },
+            "tooltip": [
+              { "field": "sample", "type": "nominal" },
+              { "field": "barcodes", "type": "nominal" },
+              { "field": "orientation", "type": "nominal" },
+              { "field": "pct", "type": "quantitative" }
+            ]
+          },
+          "data": {
+            "values": JS_TEMPLATE_VALUES
+          }
+        };
+
+        addVegaPlot('#vis_{{ID}}', schema);
+      </script>
+      <noscript class="error">
+        ERROR: Plots cannot be shown because JavaScript is disabled!
+      </noscript>
+
+      <!-- TEMPLATE: DEMULTIPLEXING_HEAD -->
+
+      <h4 id="demux-per-sample">
+        Per sample statistics <a class="anchor" href="#demux-per-sample">#</a>
+      </h4>
+
+      <!-- TEMPLATE: DEMULTIPLEXING_TABLE_HEAD -->
+
+      <div class="barcode-table">
+        <table class="pure-table pure-table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Sample</th>
+              <th>%Reads</th>
+              <th>#Reads</th>
+              <th>#Bases</th>
+              <th>Length</th>
+              <th>GC</th>
+              <th>Barcode 1</th>
+              <th>Barcode 2</th>
+              {{OPTIONAL_RAW_ORIENTATION}}
+              <th class="multiple-barcodes" style="display: none">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- TEMPLATE: DEMULTIPLEXING_ROW -->
+
+            <tr>
+              <td>{{OPTIONAL_N}}</td>
+              <td>{{OPTIONAL_RAW_NAME}}</td>
+              <td>{{OPTIONAL_SAMPLE_PCT}}</td>
+              <td>{{OPTIONAL_READS}}</td>
+              <td>{{OPTIONAL_BP}}</td>
+              <td>{{OPTIONAL_LENGTH}}</td>
+              <td>{{OPTIONAL_GC}}</td>
+              <td>{{OPTIONAL_RAW_BARCODE_1}}</td>
+              <td>{{OPTIONAL_RAW_BARCODE_2}}</td>
+              {{OPTIONAL_RAW_ORIENTATION}}
+              <td class="multiple-barcodes" style="display: none"></td>
+            </tr>
+
+            <!-- TEMPLATE: DEMULTIPLEXING_BARCODE_ROW -->
+
+            <tr class="multiple-barcodes" style="display: none">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td>{{BARCODE_1}}</td>
+              <td>{{BARCODE_2}}</td>
+              {{OPTIONAL_RAW_ORIENTATION}}
+              <td>{{BARCODE_PCT_ROW}}</td>
+            </tr>
+
+            <!-- TEMPLATE: DEMULTIPLEXING_TABLE_TAIL -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- TEMPLATE: DEMULTIPLEXING_TOGGLE -->
+
+      <p style="text-align: center;">
+        <a id="toggle-barcodes" href="#" onclick="toggleBarcodeRows(); return false;" style="color: inherit;">
+          Show/hide per-barcode statistics
+        </a>
+      </p>
+
+      <!-- TEMPLATE: BODY_END -->
+    </div>
+
+    <div class="section note epilogue">
+      <p>
+        For comments, suggestions, or feedback, please use
+        <a href="https://github.com/MikkelSchubert/adapterremoval/issues/new">GitHub Issues</a>.
+
+        If you use AdapterRemoval, please cite
+        <a href="https://doi.org/10.1186/s13104-016-1900-2">Schubert et. al. 2016</a>:
+      </p>
+
+      <p style="font-family: monospace; padding-left: 2em; padding-right: 2em;">
+        Schubert, Lindgreen, and Orlando (2016). AdapterRemoval v2: rapid adapter trimming, identification, and
+        read merging. BMC Research Notes, 12;9(1):88.
+      </p>
+
+      <p>
+        This report was generated using <a href="https://purecss.io/">Pure</a> (<a
+          href="https://github.com/pure-css/pure/blob/v2.1.0/LICENSE">license</a>) and <a
+          href="https://vega.github.io/">Vega-Lite</a> (<a
+          href="https://github.com/vega/vega-lite/blob/v5.2.0/LICENSE">license</a>).
+      </p>
+    </div>
+  </div>
+</body>
+
+</html>

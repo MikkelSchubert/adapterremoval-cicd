@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2024 Mikkel Schubert <mikkelsch@gmail.com>
+
+option(
+    'static',
+    type: 'boolean',
+    value: false,
+    description: 'Build static executable',
+)
+option(
+    'mimalloc',
+    type: 'boolean',
+    value: false,
+    description: 'Require and link to mimalloc library',
+)
+option(
+    'harden',
+    type: 'boolean',
+    value: true,
+    description: 'Build executable with hardening flags',
+)

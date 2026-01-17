@@ -1,0 +1,23 @@
+{
+  "exhaustive": true,
+  "arguments": [
+    "--adapter1",
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+    "--out-prefix",
+    "alternative"
+  ],
+  "files": {
+    "input_1": [
+      "input_1.fastq"
+    ],
+    "output": [
+      "alternative.r1.fastq.gz"
+    ],
+    "json": [
+      "alternative.json"
+    ],
+    "html": [
+      "alternative.html"
+    ]
+  }
+}
