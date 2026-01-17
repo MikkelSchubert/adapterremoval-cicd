@@ -91,9 +91,10 @@ jobs:
       - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: ${{ matrix.name }}.tar.gz
-        asset_name: ${{ matrix.name }}.tar.gz
-        tag: ${{ github.ref }}
-        draft: true
-        body: ${{ steps.changelog.outputs.TEXT }}
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.name }}.tar.gz
+          asset_name: ${{ matrix.name }}.tar.gz
+          tag: ${{ github.ref }}
+          draft: true
+          body: ${{ steps.changelog.outputs.TEXT }}
