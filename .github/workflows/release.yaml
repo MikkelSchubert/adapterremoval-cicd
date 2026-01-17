@@ -90,11 +90,10 @@ jobs:
       - name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
         with:
-          file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+          release_name: "AdapterRemoval ${{ github.ref_name }}"
           asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+          file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           tag: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.TEXT }}
           overwrite: true
           draft: true
-
-
