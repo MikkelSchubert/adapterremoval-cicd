@@ -93,8 +93,8 @@ jobs:
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}"
-          asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}"
+          file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+          asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           tag: ${{ github.ref }}
           draft: true
           body: ${{ steps.changelog.outputs.TEXT }}
