@@ -81,8 +81,11 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          echo -n "TEXT=" >> $GITHUB_OUTPUT
-          python3 scripts/latest-changes.py --escape  CHANGES.md >> $GITHUB_OUTPUT
+          {
+            echo 'TEXT<<EOF'
+            sed '1,/^## /d;/^## /,$d' CHANGES.md
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
@@ -90,7 +93,8 @@ jobs:
           file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           tag: ${{ github.ref }}
-          draft: true
           body: ${{ steps.changelog.outputs.TEXT }}
+          overwrite: true
+          draft: true
 
 
