@@ -38,6 +38,7 @@ jobs:
           tag: ${{ github.ref }}
           release_name: "AdapterRemoval ${{ github.ref_name }}"
           body: ${{ steps.changelog.outputs.TEXT }}
+          file: "not-a-valid-file"
           overwrite: true
           draft: true
 
