@@ -9,6 +9,10 @@
 #include <iomanip>       // for operator<<, setprecision
 #include <sstream>       // for ostringstream, operator<<, basic_ostream, bas...
 
+#if defined(_WIN32)
+#define localtime_r(T, Tm) (localtime_s(Tm, T) ? NULL : Tm)
+#endif
+
 namespace adapterremoval {
 
 static const auto s_start_timestamp = std::chrono::system_clock::now();
