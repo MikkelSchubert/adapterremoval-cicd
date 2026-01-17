@@ -33,7 +33,7 @@ format_time(const std::chrono::system_clock::time_point& now,
   std::ostringstream ss;
 
 #if defined(_WIN32)
-  if (localtime_s(&in_localtime, &in_time_t)) {
+  if (!localtime_s(&in_localtime, &in_time_t)) {
 #else
   if (localtime_r(&in_time_t, &in_localtime)) {
 #endif

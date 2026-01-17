@@ -40,7 +40,6 @@ jobs:
       #   uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
       #   with:
       #     egress-policy: audit
-
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
@@ -54,34 +53,23 @@ jobs:
       - name: dependencies (OS specific)
         run: bash scripts/setup-${{ matrix.os }}.sh
 
-      # - name: dependencies (common)
-      #  run: bash scripts/setup-common.sh
-
       - if: ${{ matrix.os == 'macos-latest' }}
         name: setup, build, test, and bundle
         run: |
-          bash scripts/build-common.sh STATIC=true
-          mv "install" "${TARGET}"
-          strip "${TARGET}/bin/adapterremoval3"
-          tar cvzf "${TARGET}.tar.gz" "${TARGET}"
+          bash scripts/build-common.sh STATIC=true DOCS=true
+          bash script/build-bundle.sh "build/install/opt/homebrew" "${TARGET}"
 
       - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: setup, build, test, and bundle
         run: |
-          make static-container static
-          mv -v "build/static/install/usr/local" "${TARGET}"
-          strip "${TARGET}/bin/adapterremoval3"
-          tar cvzf "${TARGET}.tar.gz" "${TARGET}"
+          make static-container static DOCS=true
+          bash script/build-bundle.sh "build/static/install/usr/local" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
         name: setup, build, test, and bundle
         run: |
-          bash scripts/build-common.sh STATIC=true
-          mkdir -p "${TARGET}"
-          mv -v "install" "${TARGET}"
-          cp -v "/ucrt64/bin/libdeflate.dll" "${TARGET}/bin/"
-          strip "${TARGET}/bin/adapterremoval3"
-          tar cvzf "${TARGET}.tar.gz" "${TARGET}"
+          bash scripts/build-common.sh STATIC=true DOCS=true
+          bash script/build-bundle.sh "build/install/usr/local" "${TARGET}"
 
       - name: Read changelog
         id: changelog

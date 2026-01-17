@@ -137,11 +137,20 @@ if not libisal.found()
     endif
 endif
 
-
 libdeflate_static = (target_machine.system() != 'windows') and static
-libdeflate = dependency('libdeflate', version: ['>=1', '<2'], static: libdeflate_static, required: false)
+libdeflate = dependency(
+    'libdeflate',
+    version: ['>=1', '<2'],
+    static: libdeflate_static,
+    required: false,
+)
 if not libdeflate.found()
-    libdeflate = dependency('deflate', version: ['>=1', '<2'], static: libdeflate_static, required: false)
+    libdeflate = dependency(
+        'deflate',
+        version: ['>=1', '<2'],
+        static: libdeflate_static,
+        required: false,
+    )
 
     # WORKAROUND: Support for older distros lacking cmake/pkgconf support
     if not libdeflate.found()

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-unix:
-    name: test on ${{ matrix.os }} with ${{ matrix.cxx }}
+    name: build and test on ${{ matrix.os }} with ${{ matrix.cxx }}
 
     runs-on: ${{ matrix.os }}
     strategy:

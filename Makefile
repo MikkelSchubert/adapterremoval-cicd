@@ -4,11 +4,15 @@
 ## Optional features; set to 'true' to enable or 'false' to disable:
 ##   $ make DEBUG=true
 
+
 # Include coverage instrumentation in build
 COVERAGE := false
 
 # Debug build; adds warnings, debugging symbols, and extra STL/POSIX asserts
 DEBUG := ${COVERAGE}
+
+# Build and install HTML documentation (https://adapterremoval.readthedocs.org)
+DOCS := false
 
 # Enable address and undefined behavior sanitation
 SANITIZE := false
@@ -85,6 +89,10 @@ coverage: ${NINJAFILE}
 coverage-xml: ${NINJAFILE}
 	ninja -C "${BUILDDIR}" coverage-xml
 
+docs: ${NINJAFILE}
+	ninja -C "${BUILDDIR}" docs/adapterremoval3.1
+	ninja -C "${BUILDDIR}" docs/html
+
 install: ${NINJAFILE}
 	meson install -C "${BUILDDIR}"
 
@@ -97,9 +105,10 @@ setup ${NINJAFILE}:
 	rm -rf "${BUILDDIR}"
 	meson setup "${BUILDDIR}" \
 		-Db_coverage=${COVERAGE} \
-		-Db_lto=${LTO} \
 		-Db_lto_mode=${LTO_MODE} \
+		-Db_lto=${LTO} \
 		-Ddebug=${DEBUG} \
+		-Ddocs=${DOCS} \
 		-Dharden=${HARDEN} \
 		-Dmimalloc=${MIMALLOC} \
 		-Dstatic=${STATIC} \

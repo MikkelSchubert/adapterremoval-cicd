@@ -17,7 +17,7 @@ echo RUNNING TESTS
 make tests
 
 echo RUNNING INSTALL
-make install DESTDIR="${PWD}/build/install"
+make install DESTDIR="${PWD}/install"
 
 echo RUNNING EXAMPLES
 make -C examples EXE="${PWD}/build/src/adapterremoval3"
