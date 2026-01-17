@@ -1,15 +1,16 @@
 name: build
 
-#on:
-#  pull_request:
-#  push:
-#    branches: [main]
+on:
+  pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   build-unix:
+    if: false
     name: build and test on ${{ matrix.os }} with ${{ matrix.cxx }}
 
     runs-on: ${{ matrix.os }}
@@ -65,6 +66,7 @@ jobs:
         run: env CCACHE_MAXSIZE=500M ccache --cleanup
 
   build-windows:
+    if: false
     name: test on windows
 
     runs-on: windows-latest

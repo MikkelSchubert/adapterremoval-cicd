@@ -99,7 +99,7 @@ docs: ${NINJAFILE}
 	ninja -C "${BUILDDIR}" docs/html
 
 install: ${NINJAFILE}
-	meson install -C "${BUILDDIR}"
+	meson install -C "${BUILDDIR}" ${MESON_OPTIONS}
 
 regression-tests: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" run-regression-tests
@@ -129,9 +129,9 @@ static:
 		--entrypoint /usr/bin/make \
 		"${CONTAINER_NAME}" \
 		-C /host/src \
-		MESON_OPTIONS=${MESON_OPTIONS} \
 		BUILDDIR=/host/out/static/build \
 		DESTDIR=/host/out/static/install \
+		PREFIX=${PREFIX} \
 		DEBUG=${DEBUG} \
 		COVERAGE=${COVERAGE} \
 		DOCS=${DOCS} \
