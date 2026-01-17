@@ -49,22 +49,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - if: ${{ matrix.os != "windows-latest" }}
+      - if: ${{ matrix.os != 'windows-latest' }}
         uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.x"
-      - if: ${{ matrix.os != "windows-latest" }}
+      - if: ${{ matrix.os != 'windows-latest' }}
         uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231 # v5.3.1
         with:
           version: "latest"
 
       # Use mold for faster linking
-      - if: ${{ matrix.os != "windows-latest" }}
+      - if: ${{ matrix.os != 'windows-latest' }}
         uses: rui314/setup-mold@45c2b085bbc0283c8e1443d4a511aaa1eda5a3a1 # v1
         with:
           mold-version: 2.38.0
           make-default: true
-      - if: ${{ matrix.os != "windows-latest" }}
+      - if: ${{ matrix.os != 'windows-latest' }}
         name: ccache
         uses: hendrikmuhs/ccache-action@a1209f81afb8c005c13b4296c32e363431bffea5 # v1.2.17
         with:
@@ -73,10 +73,10 @@ jobs:
           # Disable cache cleanups while building
           max-size: "0"
 
-      - if: ${{ matrix.os == "windows-latest" }}
+      - if: ${{ matrix.os == 'windows-latest' }}
         uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda # v2.30.0
 
-      - if: ${{ matrix.os != "windows-latest" }}
+      - if: ${{ matrix.os != 'windows-latest' }}
         shell: ${{ matrix.shell }}
         name: setup, build, and test
         run: |
