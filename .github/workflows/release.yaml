@@ -2,9 +2,9 @@ name: release
 
 on:
   push:
-    branches: [main]
-    # tags:
-    #  - 'v*.*.*'
+    # branches: [main]
+    tags:
+      - 'v*.*.*'
 
 permissions:
   contents: write
@@ -78,9 +78,6 @@ jobs:
           strip "${{ matrix.name }}/bin/adapterremoval3"
           tar cvzf "${{ matrix.name }}.tar.gz" "${{ matrix.name }}"
 
-      - name: bundle assets
-        run: bash scripts/bundle-common.sh ${{ matrix.name }}
-
       - name: Read changelog
         id: changelog
         shell: bash
@@ -91,11 +88,12 @@ jobs:
           r="${r//$'\r'/'%0D'}"  # escape '\r'
           echo "TEXT=$r" >> $GITHUB_OUTPUT
 
-      # - name: upload binaries to release
-      #   uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
-      #   repo_token: ${{ secrets.GITHUB_TOKEN }}
-      #   file: ${{ matrix.name }}.tar.gz
-      #   asset_name: ${{ matrix.name }}.tar.gz
-      #   tag: ${{ github.ref }}
-      #   draft: true
-      #   body: ${{ steps.changelog.outputs.TEXT }}
+      - if: ${{ matrix.os == "ubuntu-latest" }}
+        name: upload binaries to release
+        uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: ${{ matrix.name }}.tar.gz
+        asset_name: ${{ matrix.name }}.tar.gz
+        tag: ${{ github.ref }}
+        draft: true
+        body: ${{ steps.changelog.outputs.TEXT }}
