@@ -60,6 +60,11 @@ $(error "SANITIZE must be 'true' or 'false', not '${SANITIZE}'")
 endif
 endif
 
+ifneq ($(strip ${PREFIX}), )
+override MESON_OPTIONS += --prefix=${PREFIX}
+endif
+
+
 ###############################################################################
 
 # Meson commands cannot be run in parallel
@@ -124,6 +129,7 @@ static:
 		--entrypoint /usr/bin/make \
 		"${CONTAINER_NAME}" \
 		-C /host/src \
+		MESON_OPTIONS=${MESON_OPTIONS} \
 		BUILDDIR=/host/out/static/build \
 		DESTDIR=/host/out/static/install \
 		DEBUG=${DEBUG} \

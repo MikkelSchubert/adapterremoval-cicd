@@ -61,29 +61,29 @@ jobs:
       - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: setup, build, test, and bundle (Linux)
         run: |
-          make static-container static DOCS=true
-          bash scripts/build-bundle.sh "build/static/install/usr/local" "${TARGET}"
+          make static-container static DOCS=true PREFIX=/
+          bash scripts/build-bundle.sh "build/static/install/" "${TARGET}"
 
       - if: ${{ matrix.os == 'macos-latest' }}
         name: setup, build, test, and bundle (OSX)
         run: |
-          bash scripts/build-common.sh DOCS=true
-          bash scripts/build-bundle.sh "build/install/opt/homebrew" "${TARGET}"
+          bash scripts/build-common.sh DOCS=true PREFIX=/
+          bash scripts/build-bundle.sh "build/install/" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
         name: setup, build, test, and bundle (Windows)
         shell: msys2 {0}
         run: |
-          bash scripts/build-common.sh STATIC=true DOCS=true
-          bash scripts/build-bundle.sh "build/install/usr/local" "${TARGET}"
+          bash scripts/build-common.sh STATIC=true DOCS=true PREFIX=/
+          bash scripts/build-bundle.sh "build/install/" "${TARGET}"
 
       - name: Read changelog
         id: changelog
         shell: bash
         run: |
           r=$(sed '1,/^## /d;/^## /,$d' CHANGES.md)
-          r="${r//'%'/'%25'}"    # escape %
-          r="${r//$'\n'/'%0A'}"  # escape '\n'
+          r="${r//'%'/%25}"    # escape %
+          r="${r//$'\n'/%0A}"  # escape '\n'
           r="${r//$'\r'/}"       # remove '\r'
           echo "TEXT=$r" >> $GITHUB_OUTPUT
 
