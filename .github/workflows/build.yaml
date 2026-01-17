@@ -92,6 +92,6 @@ jobs:
       - shell: msys2 {0}
         name: setup, build, and test
         run: |
-          bash scripts/setup-windows.sh
+          bash scripts/setup-windows-latest.sh
           bash scripts/setup-common.sh
           bash scripts/build-common.sh
