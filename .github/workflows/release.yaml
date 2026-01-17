@@ -80,12 +80,7 @@ jobs:
       - name: Read changelog
         id: changelog
         shell: bash
-        run: |
-          r=$(sed '1,/^## /d;/^## /,$d' CHANGES.md)
-          r="${r//'%'/%25}"    # escape %
-          r="${r//$'\n'/%0A}"  # escape '\n'
-          r="${r//$'\r'/}"     # remove '\r'
-          echo "TEXT=$r" >> $GITHUB_OUTPUT
+        run: python3 scripts/latest-changes.py --escape CHANGES.md >> $GITHUB_OUTPUT
 
       - name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
