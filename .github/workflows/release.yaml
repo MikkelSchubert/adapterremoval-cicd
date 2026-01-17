@@ -93,6 +93,7 @@ jobs:
           release_name: "AdapterRemoval ${{ github.ref_name }}"
           asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+          release_id: ${{ github.ref }}
           tag: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.TEXT }}
           overwrite: true
