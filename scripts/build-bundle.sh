@@ -17,6 +17,7 @@ for exe in adapterremoval3 adapterremoval3.exe; do
     fi
 done
 
+# WORKAROUND: libdeflate cannot be linked statically
 if test -e "/ucrt64/bin/libdeflate.dll"; then
     cp "/ucrt64/bin/libdeflate.dll" "${TARGET}"
     cp "/ucrt64/share/licenses/libdeflate/COPYING" "${TARGET}/docs/libdeflate.COPYING"

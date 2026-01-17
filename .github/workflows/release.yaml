@@ -19,9 +19,9 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64-linux
-          # - os: macos-latest
-          #  arch: aarch64-osx
           - os: macos-latest
+            arch: aarch64-osx
+          - os: windows-latest
             arch: x86_64-windows
       # Do not auto-cancel other runners if one fails
       fail-fast: false
