@@ -277,6 +277,7 @@ JSON_WILDCARDS: dict[str, Callable[[object], bool]] = {
     "...float": lambda it: isinstance(it, float) and not math.isnan(it),
     "...[str]": _is_str_list,
     "...[str] | None": lambda it: it is None or _is_str_list(it),
+    "$schema": lambda it: isinstance(it, str),
 }
 
 # JSON path elements that do not require quoting

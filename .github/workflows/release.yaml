@@ -49,7 +49,12 @@ jobs:
         with:
           msystem: ucrt64
 
-      - name: dependencies (OS specific)
+      - if: ${{ matrix.os != 'windows-latest' }}
+        name: dependencies (Unix)
+        run: bash scripts/setup-${{ matrix.os }}.sh
+
+      - if: ${{ matrix.os == 'windows-latest' }}
+        name: dependencies (Windows)
         run: bash scripts/setup-${{ matrix.os }}.sh
 
       - if: ${{ matrix.os == 'ubuntu-latest' }}
