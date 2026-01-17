@@ -1,5 +1,6 @@
 #!/bin/sh
 set -euo # "strict" mode
+trap 's=$?; echo >&2 "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
 pacman -S --noconfirm \
     make \
@@ -10,4 +11,4 @@ pacman -S --noconfirm \
     mingw-w64-ucrt-x86_64-mimalloc \
     mingw-w64-ucrt-x86_64-python \
     mingw-w64-ucrt-x86_64-python-sphinx \
-    uv
+    mingw-w64-ucrt-x86_64-uv
