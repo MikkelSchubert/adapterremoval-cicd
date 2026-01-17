@@ -61,7 +61,7 @@ jobs:
       - name: dependencies (common)
         run: bash scripts/setup-common.sh
 
-      - if: ${{ matrix.os == "macos-latest" }}
+      - if: ${{ matrix.os == 'macos-latest' }}
         name: build, test, and bundle
         run: |
           bash scripts/build-common.sh STATIC=true
@@ -69,7 +69,7 @@ jobs:
           strip "${{ matrix.name }}/bin/adapterremoval3"
           tar cvzf "${{ matrix.name }}.tar.gz" "${{ matrix.name }}"
 
-      - if: ${{ matrix.os == "ubuntu-latest" }}
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: build, test, and bundle
         run: |
           make static-container static
