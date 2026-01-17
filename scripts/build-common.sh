@@ -17,7 +17,7 @@ echo RUNNING TESTS
 make tests
 
 echo RUNNING INSTALL
-make install DESTDIR="${PWD}/build/install" MESON_INSTALL_PREFIX=""
+make install PREFIX="${PWD}/build/install"
 
 echo RUNNING EXAMPLES
 make -C examples EXE="${PWD}/build/src/adapterremoval3"

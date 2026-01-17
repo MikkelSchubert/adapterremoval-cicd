@@ -95,11 +95,10 @@ coverage-xml: ${NINJAFILE}
 	ninja -C "${BUILDDIR}" coverage-xml
 
 docs: ${NINJAFILE}
-	ninja -C "${BUILDDIR}" docs/adapterremoval3.1
-	ninja -C "${BUILDDIR}" docs/html
+	meson compile -C "${BUILDDIR}" docs man
 
 install: ${NINJAFILE}
-	meson install -C "${BUILDDIR}" ${MESON_OPTIONS}
+	meson install -C "${BUILDDIR}"
 
 regression-tests: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" run-regression-tests
@@ -130,8 +129,7 @@ static:
 		"${CONTAINER_NAME}" \
 		-C /host/src \
 		BUILDDIR=/host/out/static/build \
-		DESTDIR=/host/out/static/install \
-		PREFIX=${PREFIX} \
+		PREFIX=/host/out/static/install \
 		DEBUG=${DEBUG} \
 		COVERAGE=${COVERAGE} \
 		DOCS=${DOCS} \
