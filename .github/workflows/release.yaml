@@ -88,7 +88,7 @@ jobs:
           r="${r//$'\r'/'%0D'}"  # escape '\r'
           echo "TEXT=$r" >> $GITHUB_OUTPUT
 
-      - if: ${{ matrix.os == "ubuntu-latest" }}
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
         name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
         repo_token: ${{ secrets.GITHUB_TOKEN }}
