@@ -56,7 +56,7 @@ jobs:
       - if: ${{ matrix.os == 'macos-latest' }}
         name: setup, build, test, and bundle
         run: |
-          bash scripts/build-common.sh STATIC=true DOCS=true
+          bash scripts/build-common.sh DOCS=true
           bash scripts/build-bundle.sh "build/install/opt/homebrew" "${TARGET}"
 
       - if: ${{ matrix.os == 'ubuntu-latest' }}
