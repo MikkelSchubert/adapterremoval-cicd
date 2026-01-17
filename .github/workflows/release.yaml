@@ -45,9 +45,9 @@ jobs:
       # - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
       #   with:
       #     python-version: "3.x"
-      # - uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231 # v5.3.1
-      #   with:
-      #     version: "latest"
+      - uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231 # v5.3.1
+        with:
+          version: "latest"
 
       # Use mold for faster linking
       # - uses: rui314/setup-mold@45c2b085bbc0283c8e1443d4a511aaa1eda5a3a1 # v1
@@ -58,8 +58,8 @@ jobs:
       # - name: dependencies (OS specific)
       #   run: bash scripts/setup-${{ matrix.os }}.sh
 
-      # - name: dependencies (common)
-      #   run: bash scripts/setup-common.sh
+      - name: dependencies (common)
+        run: bash scripts/setup-common.sh
 
       - if: ${{ matrix.os == 'macos-latest' }}
         name: build, test, and bundle
