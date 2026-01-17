@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  release-unix:
+  release:
     name: build assets for ${{ matrix.os }} with ${{ matrix.cxx }}
 
     runs-on: ${{ matrix.os }}
@@ -84,7 +84,7 @@ jobs:
           r=$(sed '1,/^## /d;/^## /,$d' CHANGES.md)
           r="${r//'%'/%25}"    # escape %
           r="${r//$'\n'/%0A}"  # escape '\n'
-          r="${r//$'\r'/}"       # remove '\r'
+          r="${r//$'\r'/}"     # remove '\r'
           echo "TEXT=$r" >> $GITHUB_OUTPUT
 
       - name: upload binaries to release
@@ -95,3 +95,5 @@ jobs:
           tag: ${{ github.ref }}
           draft: true
           body: ${{ steps.changelog.outputs.TEXT }}
+
+

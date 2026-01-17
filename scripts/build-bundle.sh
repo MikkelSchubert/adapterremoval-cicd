@@ -6,7 +6,7 @@ PREFIX=$1
 TARGET=$2
 
 mkdir -p "${TARGET}"
-for exe in adapterremoval3 adapterremoval3.exe; do
+for exe in adapterremoval3.exe adapterremoval3; do
     if test -e "${PREFIX}/bin/${exe}"; then
         strip "${PREFIX}/bin/${exe}"
         mv -v "${PREFIX}/bin/${exe}" "${TARGET}/"
