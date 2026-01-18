@@ -3,7 +3,7 @@ name: release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v3.*.*'
   workflow_dispatch:
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
           tag: ${{ github.ref }}
           release_name: "AdapterRemoval ${{ github.ref_name }}"
           body: ${{ steps.changelog.outputs.TEXT }}
-          file: "examples" # must exist, but wont be uploaded since it's not a file as of v2.11.3
+          file: "examples" # must exist, but won't be uploaded since it's not a file as of v2.11.3
           overwrite: true
           draft: true
 
