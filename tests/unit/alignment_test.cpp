@@ -1867,21 +1867,31 @@ TEST_CASE("Brute-force validation", "[alignment::compare_subsequences]")
 {
   // Parameterize tests over supported SIMD instruction sets
   const auto is = simd::instruction_set::none;
-  const auto func = simd::get_compare_subsequences_func(is);
-  const auto padding = simd::padding(is);
-  // Randomly generated sequence
-  const std::string reference =
-    "CTGGTTAAAGATCAGAATCCTTTTATTTGCGGAAATTCGAATTATATCCTGATCAGTCGGTGGCGCTAGTGTCC"
-    "AGGGGATCTTGGAATTGGATCCAAAAAGTGCTGGGGAATGCGGATTCCATTATGAGACCTGT";
 
+  WARN(std::string(simd::name(is)));
   // The SECTION identifies the instruction set in failure messages
   SECTION(std::string{ simd::name(is) })
   {
+    WARN("1");
+    const auto func = simd::get_compare_subsequences_func(is);
+    WARN("2");
+    const auto padding = simd::padding(is);
+    // Randomly generated sequence
+    WARN("3");
+    const std::string reference =
+      "CTGGTTAAAGATCAGAATCCTTTTATTTGCGGAAATTCGAATTATATCCTGATCAGTCGGTGGCGCTAGTGT"
+      "CCAGGGGATCTTGGAATTGGATCCAAAAAGTGCTGGGGAATGCGGATTCCATTATGAGACCTGT";
+
+    WARN("4");
     compare(func, "", "", 0, MMNs{ 0, 0 });
 
+    WARN("5");
     for (size_t length = 1; length < reference.size(); ++length) {
+      WARN("length=" + stringify(length));
+      WARN("6");
       SECTION(stringify(length))
       {
+        WARN("7");
         std::string seq_1 = reference.substr(0, length);
         seq_1.resize(length + padding, 'N');
         std::string seq_2 = seq_1;
