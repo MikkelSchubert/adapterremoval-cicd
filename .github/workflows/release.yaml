@@ -60,7 +60,7 @@ jobs:
 
     env:
       CXX: ${{ matrix.cxx }}
-      TARGET: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}"
+      TARGET: "adapterremoval-${{ github.ref_name }}-${{ matrix.arch }}"
 
     needs: create_draft_release
 
@@ -101,7 +101,7 @@ jobs:
       - if: ${{ matrix.os == 'macos-latest' }}
         name: setup, build, test, and bundle (OSX)
         run: |
-          bash scripts/build-common.sh DOCS=true
+          bash scripts/build-common.sh DOCS=true STATIC=true LTO=false
           bash scripts/build-bundle.sh "build/install/" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
@@ -114,7 +114,7 @@ jobs:
       - name: upload binaries to release
         uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2.11.3
         with:
-          asset_name: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
-          file: "adapterremoval3-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+          asset_name: "adapterremoval-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
+          file: "adapterremoval-${{ github.ref_name }}-${{ matrix.arch }}.tar.gz"
           release_id: ${{ needs.create_draft_release.outputs.release_id }}
           draft: true
