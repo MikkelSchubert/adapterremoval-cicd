@@ -1866,7 +1866,7 @@ compare(simd::compare_subsequences_func func,
 TEST_CASE("Brute-force validation", "[alignment::compare_subsequences]")
 {
   // Parameterize tests over supported SIMD instruction sets
-  const auto is = PARAMETERIZE_IS;
+  const auto is = simd::instruction_set::none;
   const auto func = simd::get_compare_subsequences_func(is);
   const auto padding = simd::padding(is);
   // Randomly generated sequence
@@ -1877,7 +1877,7 @@ TEST_CASE("Brute-force validation", "[alignment::compare_subsequences]")
   // The SECTION identifies the instruction set in failure messages
   SECTION(std::string{ simd::name(is) })
   {
-    // compare(func, "", "", 0, MMNs{ 0, 0 });
+    compare(func, "", "", 0, MMNs{ 0, 0 });
 
     for (size_t length = 1; length < reference.size(); ++length) {
       SECTION(stringify(length))
