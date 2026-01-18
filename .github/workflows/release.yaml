@@ -50,11 +50,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            arch: x86_64-linux
+            arch: linux-x86_64
           - os: macos-latest
-            arch: aarch64-osx
+            arch: macos-aarch64
           - os: windows-latest
-            arch: x86_64-windows
+            arch: windows-x86_64
       # Do not auto-cancel other runners if one fails
       fail-fast: false
 
@@ -101,7 +101,7 @@ jobs:
       - if: ${{ matrix.os == 'macos-latest' }}
         name: setup, build, test, and bundle (OSX)
         run: |
-          bash scripts/build-common.sh DOCS=true STATIC=true LTO=false
+          bash scripts/build-common.sh DOCS=true STATIC=true
           bash scripts/build-bundle.sh "build/install/" "${TARGET}"
 
       - if: ${{ matrix.os == 'windows-latest' }}
