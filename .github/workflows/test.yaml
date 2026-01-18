@@ -55,10 +55,11 @@ jobs:
           # Disable cache cleanups while building
           max-size: "0"
 
-      - name: setup, build, and test
-        run: |
-          bash scripts/setup-${{ matrix.os }}.sh
-          bash scripts/build-common.sh DEBUG=true SANITIZE=true
+      - name: dependencies (OS specific)
+        run: bash scripts/setup-${{ matrix.os }}.sh
+
+      - name: build and test
+        run: bash scripts/build-common.sh DEBUG=true SANITIZE=true
 
       - name: CCache cleanup
         # Manual ccache cleanup, using the ccache-action default max size
@@ -82,8 +83,10 @@ jobs:
         with:
           msystem: ucrt64
 
-      - name: setup, build, and test
+      - name: dependencies (OS specific)
         shell: msys2 {0}
-        run: |
-          bash scripts/setup-windows-latest.sh
-          bash scripts/build-common.sh DEBUG=true
+        run: bash scripts/setup-windows-latest.sh
+
+      - name: build and test
+        shell: msys2 {0}
+        run: bash scripts/build-common.sh DEBUG=true

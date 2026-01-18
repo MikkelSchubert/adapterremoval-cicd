@@ -19,6 +19,7 @@ namespace adapterremoval {
 using glibc_strerror_r = char* (*)(int, char*, size_t);
 using posix_strerror_r = int (*)(int, char*, size_t);
 using posix_strerror_s = int (*)(char*, size_t, int);
+
 //! Recommended buffer size according to `strerror` man page
 using strerror_buf = std::array<char, 1024>;
 

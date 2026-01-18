@@ -10,7 +10,7 @@
 #include <utility>   // for pair
 #include <vector>    // for vector
 
-// #define CATCH_CONFIG_FAST_COMPILE
+#define CATCH_CONFIG_FAST_COMPILE
 #define CATCH_CONFIG_FALLBACK_STRINGIFIER ::Catch::fallbackStringifier
 
 namespace Catch {

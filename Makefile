@@ -4,7 +4,6 @@
 ## Optional features; set to 'true' to enable or 'false' to disable:
 ##   $ make DEBUG=true
 
-
 # Include coverage instrumentation in build
 COVERAGE := false
 
@@ -37,10 +36,11 @@ MIMALLOC := $(STATIC)
 ###############################################################################
 # (Container for) building static binaries using Alpine
 
+# Podman is preferred (and the fallback if neither is found), since it is more
+# likely that the user can execute podman than docker, if both are present
 CONTAINER_RUNNER := $(firstword $(shell which podman docker) podman)
 
 CONTAINER_NAME := ar3static
-
 
 ###############################################################################
 
@@ -60,10 +60,10 @@ $(error "SANITIZE must be 'true' or 'false', not '${SANITIZE}'")
 endif
 endif
 
+# Use custom installation prefix instead of the system default
 ifneq ($(strip ${PREFIX}), )
 override MESON_OPTIONS += --prefix=${PREFIX}
 endif
-
 
 ###############################################################################
 
@@ -109,8 +109,8 @@ setup ${NINJAFILE}:
 	rm -rf "${BUILDDIR}"
 	meson setup "${BUILDDIR}" \
 		-Db_coverage=${COVERAGE} \
-		-Db_lto_mode=${LTO_MODE} \
 		-Db_lto=${LTO} \
+		-Db_lto_mode=${LTO_MODE} \
 		-Ddebug=${DEBUG} \
 		-Ddocs=${DOCS} \
 		-Dharden=${HARDEN} \
@@ -155,6 +155,6 @@ update-regression-tests: ${NINJAFILE}
 
 test tests: executables unit-tests regression-tests
 
-.PHONY: clean clean-coverage coverage-xml coverage executable executables \
-	install regression-tests setup static-container static test tests \
-	unit-tests unit-tests-executable update-regression-tests
+.PHONY: clean clean-coverage coverage-xml coverage docs executable \
+	executables install regression-tests setup static-container static test \
+	tests unit-tests unit-tests-executable update-regression-tests

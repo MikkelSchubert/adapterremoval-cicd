@@ -213,7 +213,7 @@ set_timestamps(bool enabled)
 size_t
 get_terminal_width()
 {
-#if !defined(_WIN32) || !_WIN32
+#if !defined(_WIN32)
   struct winsize params = {};
   // Attempt to retrieve the number of columns in the terminal
   if (ioctl(STDERR_FILENO, TIOCGWINSZ, &params) == 0) {

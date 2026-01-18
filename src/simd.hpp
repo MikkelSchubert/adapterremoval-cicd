@@ -31,7 +31,6 @@ name(instruction_set value);
 size_t
 padding(instruction_set value);
 
-/***/
 using compare_subsequences_func = bool (*)(size_t& n_mismatches,
                                            size_t& n_ambiguous,
                                            const char* seq_1,

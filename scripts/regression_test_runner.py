@@ -1420,6 +1420,9 @@ def main(argv: list[str]) -> int:
     print(f"Found {len(tests)} specifications; generated {len(exhaustive_tests)} tests")
     print(f"Using work-dir {quote(args.work_dir)}")
 
+    if hasattr(os, "setsid"):
+        os.setsid()
+
     n_failures = 0
     n_successes = 0
     n_skipped = 0

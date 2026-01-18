@@ -5,7 +5,7 @@
 #include "debug.hpp"    // for AR_FAIL
 #include "logging.hpp"  // for info, log_stream, cerr
 #include "strutils.hpp" // for format_rough_number, format_thousand_sep
-#include <chrono>       // for microseconds
+#include <chrono>       // for milliseconds
 #include <iomanip>      // for operator<<, setfill, setw
 #include <sstream>      // for operator<<, basic_ostream, ostringstream
 #include <string>       // for string, operator<<, basic_string, char_traits
@@ -28,9 +28,9 @@ const size_t REPORT_EVERY_NTH_LOOP =
 //! Increment the spinner every time-unit
 const auto SPIN_EVERY =
 #if defined(_WIN32)
-  std::chrono::microseconds(200000);
+  std::chrono::milliseconds(200);
 #else
-  std::chrono::microseconds(100000);
+  std::chrono::milliseconds(100);
 #endif
 
 std::string
@@ -153,6 +153,7 @@ progress_timer::loop()
 
   const std::vector<std::string> symbols =
 #if defined(_WIN32)
+    // A simple ASCII spinner is used, to avoid having to deal with encodings
     { ".", "o", "O", "o", "." };
 #else
     { "⠙", "⠸", "⢰", "⣠", "⣄", "⡆", "⠇", "⠋" };
