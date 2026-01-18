@@ -1,4 +1,4 @@
-name: build
+name: test
 
 on:
   pull_request:
@@ -9,9 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  build-unix:
-    if: false
-    name: build and test on ${{ matrix.os }} with ${{ matrix.cxx }}
+  test-unix:
+    name: test on ${{ matrix.os }} with ${{ matrix.cxx }}
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -65,8 +64,7 @@ jobs:
         # Manual ccache cleanup, using the ccache-action default max size
         run: env CCACHE_MAXSIZE=500M ccache --cleanup
 
-  build-windows:
-    if: false
+  test-windows:
     name: test on windows
 
     runs-on: windows-latest
