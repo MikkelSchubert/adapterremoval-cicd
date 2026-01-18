@@ -1297,7 +1297,6 @@ TEST_CASE("Higher quality nucleotide is selected [additive]")
   REQUIRE(record1 == expected);
 }
 
-#if 0
 TEST_CASE("Set conflicts to N/! [additive]")
 {
   fastq record1("Rec1", "G", "1");
@@ -1310,7 +1309,6 @@ TEST_CASE("Set conflicts to N/! [additive]")
   merger.merge(alignment, record1, record2);
   REQUIRE(record1 == expected);
 }
-#endif
 
 TEST_CASE("Offsets past the end throws [additive]")
 {
