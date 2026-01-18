@@ -1,5 +1,5 @@
-#!/bin/sh
-set -euo # "strict" mode
+#!/bin/bash
+set -euo pipefail # "strict" mode
 trap 's=$?; echo >&2 "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
 echo RUNNING SETUP
