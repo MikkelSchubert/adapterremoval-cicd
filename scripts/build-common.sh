@@ -13,11 +13,8 @@ fi
 echo RUNNING COMPILE
 make executables
 
-echo RUNNING UNIT-TESTS
-gdb -arch x86_64 -batch -ex "run" -ex "bt" --args build/tests/unit/unit_tests --break 2>&1 | grep -v "^No stack.$"
-
 echo RUNNING TESTS
-make regression-tests
+make tests
 
 echo RUNNING INSTALL
 make install
