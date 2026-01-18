@@ -49,12 +49,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            arch: linux-x86_64
+          # - os: ubuntu-latest
+          #   arch: linux-x86_64
           - os: macos-latest
             arch: macos-aarch64
-          - os: windows-latest
-            arch: windows-x86_64
+          # - os: windows-latest
+          #   arch: windows-x86_64
       # Do not auto-cancel other runners if one fails
       fail-fast: false
 

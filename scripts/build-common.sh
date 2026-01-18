@@ -13,8 +13,11 @@ fi
 echo RUNNING COMPILE
 make executables
 
+echo RUNNING UNIT-TESTS
+gdb -batch -ex "run" -ex "bt" build/tests/unit/unit_tests --break 2>&1 | grep -v "^No stack.$"
+
 echo RUNNING TESTS
-make tests
+make regression-tests
 
 echo RUNNING INSTALL
 make install

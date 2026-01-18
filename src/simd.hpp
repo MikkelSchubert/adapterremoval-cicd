@@ -40,8 +40,8 @@ using compare_subsequences_func = bool (*)(size_t& n_mismatches,
                                            size_t max_penalty);
 
 #define DECLARE_COMPARE_SUBSEQUENCES_SIMD(IS)                                  \
-  bool compare_subsequences_##IS(size_t& out_mismatches,                       \
-                                 size_t& out_ambiguous,                        \
+  bool compare_subsequences_##IS(size_t& n_mismatches,                         \
+                                 size_t& n_ambiguous,                          \
                                  const char* seq_1,                            \
                                  const char* seq_2,                            \
                                  size_t length,                                \
