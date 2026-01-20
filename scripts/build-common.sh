@@ -2,10 +2,6 @@
 set -euo # "strict" mode
 trap 's=$?; echo >&2 "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
-echo CHECKING GIT
-ls -a
-git describe --long --tags --dirty --broken || true
-
 echo RUNNING SETUP
 # WORKAROUND for empty `$@` failing with `set -u` on OSX
 if test $# -gt 0; then

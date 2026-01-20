@@ -76,11 +76,7 @@ BUILDDIR := build
 NINJAFILE := ${BUILDDIR}/build.ninja
 
 executable: ${NINJAFILE}
-	git diff | cat
-	git status | cat
 	meson compile -C "${BUILDDIR}" adapterremoval3
-	git diff | cat
-	git status | cat
 
 executables: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" adapterremoval3 unit_tests
@@ -108,8 +104,6 @@ regression-tests: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" run-regression-tests
 
 setup ${NINJAFILE}:
-	git diff | cat
-	git status | cat
 	# WORKAROUND: `setup` fails on existing builddirs without `--reconfigure`,
 	#             but that option requires existing builddir in v1.0.0 or older
 	rm -rf "${BUILDDIR}"
@@ -123,8 +117,6 @@ setup ${NINJAFILE}:
 		-Dmimalloc=${MIMALLOC} \
 		-Dstatic=${STATIC} \
 		${MESON_OPTIONS}
-	git diff | cat
-	git status | cat
 
 static:
 	mkdir -p "${BUILDDIR}"
@@ -156,11 +148,7 @@ unit-tests-executable: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" unit_tests
 
 unit-tests: ${NINJAFILE}
-	git diff | cat
-	git status | cat
 	meson compile -C "${BUILDDIR}" run-unit-tests
-	git diff | cat
-	git status | cat
 
 update-regression-tests: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" update-regression-tests
