@@ -1,0 +1,13 @@
+{
+  "$schema": "https://MikkelSchubert.github.io/adapterremoval/schemas/3.0.0-alpha3.json",
+  "meta": "...",
+  "summary": "...",
+  "input": "...",
+  "demultiplexing": null,
+  "processing": [
+    { "step": "ambiguous_bases", "action": "filter", "reads": 2, "bases": 300 },
+    { "step": "...", "action": "...", "reads": 0, "bases": 0, "...": "..." }
+  ],
+  "analyses": "...",
+  "output": "..."
+}

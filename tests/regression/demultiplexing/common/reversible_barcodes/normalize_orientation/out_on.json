@@ -56,7 +56,7 @@
           { "barcode1": "GGCCACTC", "barcode2": "TAAAGGTA", "orientation": "reverse", "reads": 4 }
         ],
         "output": {
-          "read1":"...",
+          "read1": "...",
           "read2": "...",
           "singleton": "...",
           "merged": {
@@ -98,8 +98,7 @@
       ]
     },
     { "step": "merging", "action": "merge", "reads": 14, "bases": 182, "corrected": 0, "masked": 0, "unmasked": 0 },
-    { "step": "low_quality", "action": "trim", "reads": 0, "bases": 0 },
-    { "step": "min_length", "action": "filter", "reads": 0, "bases": 0 }
+    { "step": "...", "action": "...", "reads": 0, "bases": 0 }
   ],
   "analyses": {
     "duplication": null,
