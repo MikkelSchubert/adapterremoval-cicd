@@ -80,6 +80,7 @@ executable: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" adapterremoval3
 
 executables: ${NINJAFILE}
+	git status
 	meson compile -C "${BUILDDIR}" adapterremoval3 unit_tests
 
 clean:
