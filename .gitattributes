@@ -1,7 +1,4 @@
 # WORKAROUND: Ensure that checkout on Windows CI > MSYS2 retain original line
 #             ending. This prevents a `git describe` flagging the repo as dirty
 
-# There are currently no binary files in the repo
-* eol=lf
-# Regression test for reading of files with CRLF line-endings
-**/crlf_newlines/input_*.fastq eol=crlf
+* text=auto
