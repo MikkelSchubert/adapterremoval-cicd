@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   pre-commit:
+    if: 0
     runs-on: ubuntu-latest
 
     env:

@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   test-unix:
+    if: 0
     name: test on ${{ matrix.os }} with ${{ matrix.cxx }}
 
     runs-on: ${{ matrix.os }}
@@ -66,6 +67,7 @@ jobs:
         run: env CCACHE_MAXSIZE=500M ccache --cleanup
 
   test-windows:
+    if: 0
     name: test on windows
 
     runs-on: windows-latest

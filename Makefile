@@ -76,6 +76,7 @@ BUILDDIR := build
 NINJAFILE := ${BUILDDIR}/build.ninja
 
 executable: ${NINJAFILE}
+	git status
 	meson compile -C "${BUILDDIR}" adapterremoval3
 
 executables: ${NINJAFILE}
