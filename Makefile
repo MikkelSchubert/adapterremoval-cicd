@@ -79,8 +79,6 @@ executable: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" adapterremoval3
 
 executables: ${NINJAFILE}
-	# git status
-	git update-index --really-refresh
 	meson compile -C "${BUILDDIR}" adapterremoval3 unit_tests
 
 clean:
@@ -106,6 +104,7 @@ regression-tests: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" run-regression-tests
 
 setup ${NINJAFILE}:
+	git update-index --really-refresh || true
 	# WORKAROUND: `setup` fails on existing builddirs without `--reconfigure`,
 	#             but that option requires existing builddir in v1.0.0 or older
 	rm -rf "${BUILDDIR}"
