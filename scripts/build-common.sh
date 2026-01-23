@@ -2,9 +2,6 @@
 set -euo # "strict" mode
 trap 's=$?; echo >&2 "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
-# WORKAROUND: Force update of index for subsequent `git describe`
-git status
-
 echo RUNNING SETUP
 # WORKAROUND for empty `$@` failing with `set -u` on OSX
 if test $# -gt 0; then

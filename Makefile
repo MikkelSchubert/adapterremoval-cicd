@@ -104,7 +104,7 @@ regression-tests: ${NINJAFILE}
 	meson compile -C "${BUILDDIR}" run-regression-tests
 
 setup ${NINJAFILE}:
-	git update-index --really-refresh || true
+	git update-index --refresh || true
 	# WORKAROUND: `setup` fails on existing builddirs without `--reconfigure`,
 	#             but that option requires existing builddir in v1.0.0 or older
 	rm -rf "${BUILDDIR}"
