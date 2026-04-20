@@ -411,6 +411,8 @@ managed_writer::close()
 
     m_file = nullptr;
   }
+
+  int foo;
 }
 
 } // namespace adapterremoval
